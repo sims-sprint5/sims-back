@@ -1,0 +1,97 @@
+### Laravel & PHP ###
+# Environment files
+/.env
+/.env.backup
+/.env.production
+.env.*
+
+# Composer vendor
+/vendor/
+
+# Node dependencies
+/node_modules/
+npm-debug.log
+yarn-error.log
+
+# Public build / hot reload
+/public/hot
+/public/build
+/public/storage
+
+# Storage keys (keep dirs, ignore keys)
+/storage/*.key
+
+# PHPUnit cache
+.phpunit.result.cache
+.phpunit.cache
+
+### IDEs & editors ###
+/.idea/
+/.vscode/
+.phpactor.json
+/.phpunit.cache
+/.nova/
+/.fleet/
+/.zed/
+*.code-workspace
+
+### OS generated files ###
+.DS_Store
+Thumbs.db
+
+### Logs / debug / temp ###
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+*.cache
+/.sass-cache
+/.cache
+/storage/logs/*.log
+
+### Build / package managers ###
+/.parcel-cache/
+
+### Misc / secrets ###
+/auth.json
+composer.phar
+composer.lock
+
+### Docker ###
+DockerFile
+docker-compose.yml
+/.docker/
+
+### Homestead ###
+Homestead.yaml
+Homestead.json
+
+### DB / backups ###
+*.sql
+*.sqlite
+
+### Editor swap / project files ###
+*.swp
+*.swo
+*.sublime-workspace
+*.sublime-project
+
+# Keep storage and bootstrap/cache directories in repo structure but ignore their runtime files
+/storage/framework/cache/data/
+/storage/framework/sessions/
+/storage/framework/views/
+/storage/logs/
+
+# Ignore API tests and Postman collection
+/API_TESTS.md
+/Blink_API_Postman_Collection.json
+
+# Ignorar documentación y colección de autenticación locales
+AUTH_DOCUMENTATION.md
+Blink_API_Postman_Collection
+Blink_Auth_Postman_Collection.json
+
+# Ignorar colección completa de Postman y scripts locales
+Blink_API_Complete_Collection.json
+get_token.sh
+test_all_routes_joel.sh
