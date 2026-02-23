@@ -16,9 +16,8 @@
 8. [Autenticación por tenant](#autenticación-por-tenant)
 9. [Seeders](#seeders)
 10. [Roles, permisos y policies](#roles-permisos-y-policies)
-11. [Estructura de módulos](#estructura-de-módulos)
-12. [Comandos útiles](#comandos-útiles)
-13. [Troubleshooting](#troubleshooting)
+11. [Comandos útiles](#comandos-útiles)
+12. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -249,51 +248,53 @@ Configuración clave:
 
 ## Migraciones centrales vs tenant
 
+En multi-tenancy con schemas, las migraciones se **separan en dos carpetas** según a qué schema pertenecen.
+
 ### Migraciones centrales (`database/migrations/`)
 
-Se ejecutan con `php artisan migrate` y afectan **solo al schema `public`**:
+Son las migraciones normales de Laravel. Se ejecutan con `php artisan migrate` y afectan **solo al schema `public`**. Aquí van todas las tablas compartidas entre tenants:
 
-| Archivo | Tabla |
-|---------|-------|
-| `0000_01_01_000000_enable_extensions.php` | Habilita `uuid-ossp` y `postgis` |
-| `0001_01_01_000000_create_global_admins_table.php` | `global_admins` |
-| `0001_01_01_000001_create_cache_table.php` | `cache`, `cache_locks` |
-| `0001_01_01_000002_create_jobs_table.php` | `jobs`, `job_batches`, `failed_jobs` |
-| `2019_09_15_000005_create_plans_table.php` | `plans` |
-| `2019_09_15_000006_create_features_table.php` | `features` |
-| `2019_09_15_000007_create_plan_features_table.php` | `plan_features` |
-| `2019_09_15_000010_create_tenants_table.php` | `tenants` |
-| `2019_09_15_000020_create_domains_table.php` | `domains` |
-| `2026_01_31_000050_create_tenant_invoices_table.php` | `tenant_invoices` |
-| `2026_01_31_124700_create_permission_tables.php` | `permissions`, `roles`, `model_has_*` (central) |
+- Tablas del propio paquete Stancl: `tenants`, `domains`
+- Tablas de infraestructura: `cache`, `jobs`, `failed_jobs`
+- Tablas de negocio global: `plans`, `features`, `global_admins`, `tenant_invoices`
+- Cualquier tabla que NO sea específica de un tenant
+
+**Crear una migración central** (funciona igual que siempre):
+
+```bash
+php artisan make:migration create_plans_table
+# → Se crea en database/migrations/
+```
 
 ### Migraciones de tenant (`database/migrations/tenant/`)
 
-Se ejecutan **dentro del schema de cada tenant** cuando se crea o migra un tenant:
+Se ejecutan **dentro del schema de cada tenant** cuando se crea o migra un tenant. Aquí van las tablas de negocio que cada tenant tiene de forma aislada: `users`, `vehicles`, `bookings`, `incidences`, etc.
 
-| Archivo | Tabla |
-|---------|-------|
-| `2026_01_31_000001_create_users_table.php` | `users` |
-| `2026_01_31_000005_create_vehicles_table.php` | `vehicles` |
-| `2026_01_31_000006_create_geofences_table.php` | `geofences` |
-| `2026_01_31_000007_create_bookings_table.php` | `bookings` |
-| `2026_01_31_000008_create_payments_table.php` | `payments` |
-| `2026_01_31_000010_create_support_tickets_table.php` | `support_tickets` |
-| `2026_01_31_000011_create_maintenance_table.php` | `maintenance` |
-| `2026_01_31_000012_create_incidences_table.php` | `incidences` |
-| `2026_01_31_000013_create_api_keys_table.php` | `api_keys` |
-| `2026_01_31_000014_create_tenant_branding_table.php` | `tenant_branding` |
-| `2026_01_31_000015_create_vehicle_locations_table.php` | `vehicle_locations` |
-| `2026_01_31_000016_create_audit_logs_table.php` | `audit_logs` |
-| `2026_01_31_000017_create_payment_webhook_events_table.php` | `payment_webhook_events` |
-| `2026_01_31_000018_add_indexes_to_tenant_tables.php` | Índices de rendimiento |
-| `2026_01_31_104458_create_personal_access_tokens_table.php` | `personal_access_tokens` (Sanctum) |
-| `2026_01_31_124700_create_permission_tables.php` | `permissions`, `roles`, `model_has_*` (tenant) |
-| `2026_01_31_124703_remove_role_column_from_users_table.php` | Limpieza columna `role` |
+**Crear una migración de tenant** — se genera igual pero luego se **mueve manualmente** a la subcarpeta `tenant/`:
 
-### ¿Cómo se ejecutan las migraciones de tenant?
+```bash
+# 1. Generar la migración normalmente
+php artisan make:migration create_products_table
 
-La configuración en `config/tenancy.php` indica la ruta:
+# 2. Mover el archivo a la carpeta de tenant
+mv database/migrations/2026_XX_XX_create_products_table.php database/migrations/tenant/
+```
+
+> **Importante**: Laravel no tiene un flag para generar directamente en `tenant/`. Siempre se genera en `database/migrations/` y hay que moverla.
+
+### Diferencias clave
+
+| Aspecto | Central (`migrations/`) | Tenant (`migrations/tenant/`) |
+|---------|------------------------|-------------------------------|
+| **Schema destino** | `public` | `tenant_{id}` |
+| **Comando para ejecutar** | `php artisan migrate` | `php artisan tenants:migrate` |
+| **Se ejecuta en** | Una sola vez | Una vez **por cada tenant** |
+| **Cuándo se ejecuta auto** | Al hacer `migrate` | Al crear un tenant nuevo (pipeline) |
+| **Ejemplo de tablas** | `tenants`, `plans`, `domains` | `users`, `vehicles`, `bookings` |
+
+### ¿Cómo sabe Stancl qué migraciones son de tenant?
+
+La configuración en `config/tenancy.php` indica la ruta explícitamente:
 
 ```php
 'migration_parameters' => [
@@ -303,10 +304,64 @@ La configuración en `config/tenancy.php` indica la ruta:
 ],
 ```
 
-Cuando se crea un nuevo tenant, el pipeline de eventos automaticamente ejecuta:
-1. `Jobs\CreateDatabase` — Crea el schema `tenant_{id}`
-2. `Jobs\MigrateDatabase` — Ejecuta las migraciones de la carpeta `tenant/`
-3. `Jobs\SeedDatabase` — Ejecuta `TenantDatabaseSeeder`
+Stancl **solo ejecuta lo que esté en `database/migrations/tenant/`** cuando corre migraciones de tenant. Todo lo que esté fuera de esa carpeta se ignora.
+
+### ¿Cómo se ejecutan automáticamente?
+
+Cuando se crea un nuevo tenant con `Tenant::create([...])`, el `TenancyServiceProvider` dispara un pipeline de Jobs:
+
+1. **`Jobs\CreateDatabase`** — Ejecuta `CREATE SCHEMA "tenant_{id}"` en PostgreSQL.
+2. **`Jobs\MigrateDatabase`** — Corre `php artisan migrate` pero solo con los archivos de `migrations/tenant/`, dentro del schema recién creado.
+3. **`Jobs\SeedDatabase`** — Ejecuta el seeder configurado (`TenantDatabaseSeeder`).
+
+Este pipeline se define en `TenancyServiceProvider`:
+
+```php
+Events\TenantCreated::class => [
+    JobPipeline::make([
+        Jobs\CreateDatabase::class,
+        Jobs\MigrateDatabase::class,
+        Jobs\SeedDatabase::class,
+    ])->send(function (Events\TenantCreated $event) {
+        return $event->tenant;
+    })->shouldBeQueued(false),   // false = síncrono, true = cola de jobs
+],
+```
+
+### Migrar tenants manualmente
+
+Si agregas una nueva migración de tenant a un proyecto que ya tiene tenants creados:
+
+```bash
+# Migrar TODOS los tenants existentes
+php artisan tenants:migrate
+
+# Migrar solo un tenant específico
+php artisan tenants:migrate --tenants=1
+
+# Rollback de todos los tenants
+php artisan tenants:rollback
+
+# Ver estado de migraciones de un tenant
+php artisan tenants:migrate-status --tenants=1
+```
+
+### Ejemplo completo: agregar tabla `products` a todos los tenants
+
+```bash
+# 1. Crear la migración
+php artisan make:migration create_products_table
+
+# 2. Moverla a la carpeta de tenant
+mv database/migrations/2026_*_create_products_table.php database/migrations/tenant/
+
+# 3. Editar el archivo con la estructura deseada (Schema::create, etc.)
+
+# 4. Aplicar a todos los tenants existentes
+php artisan tenants:migrate
+```
+
+Cualquier tenant nuevo que se cree **después** de este paso también recibirá la tabla automáticamente, porque el pipeline ejecuta todas las migraciones de `tenant/`.
 
 ---
 
@@ -361,7 +416,7 @@ El proyecto **no usa subdominios ni dominios** para identificar el tenant en la 
 
 ### Middleware `InitializeTenantFromHeader`
 
-Ubicación: `app/Http/Middleware/InitializeTenantFromHeader.php`
+Ubicación: `app/Http/Middleware/InitializeTenantFromHeader.php` (estructura estándar de Laravel)
 
 Flujo:
 
@@ -405,7 +460,10 @@ Route::prefix('tenant')
     ->middleware(['api', InitializeTenantFromHeader::class])
     ->group(function () {
         // Auth: register, login (público dentro del tenant)
-        // Users, Vehicles, Incidences (requieren AuthenticateTenant)
+
+        Route::middleware(AuthenticateTenant::class)->group(function () {
+            // Rutas protegidas: users, vehicles, incidences, etc.
+        });
     });
 ```
 
@@ -423,7 +481,7 @@ Route::prefix('tenant')
 
 ### Middleware `AuthenticateTenant`
 
-Ubicación: `app/Http/Middleware/AuthenticateTenant.php`
+Ubicación: `app/Http/Middleware/AuthenticateTenant.php` (estructura estándar de Laravel)
 
 Este middleware se ejecuta **después** de `InitializeTenantFromHeader` y verifica el Bearer token de Sanctum:
 
@@ -476,20 +534,29 @@ Headers: X-Tenant-ID: 1, Authorization: Bearer 5|abc123...
 
 ### Orden de ejecución
 
+El `DatabaseSeeder` orquesta todo. Los seeders se colocan en la ruta estándar de Laravel (`database/seeders/`):
+
 ```
-DatabaseSeeder
-├── 1. GlobalAdminSeeder       → Crea super admin en public.global_admins
-├── 2. PlanSeeder              → Crea 3 planes en public.plans
-└── 3. TenantSeeder            → Para cada tenant:
-    ├── Crea registro en public.tenants
-    ├── Crea dominio en public.domains
-    ├── CREATE SCHEMA tenant_X
-    ├── Ejecuta migraciones de tenant
-    ├── RolePermissionSeeder   → Roles: admin_tenant, worker, client
-    ├── UserSeeder             → Permisos de users: view, manage, destroy
-    ├── VehiclePermissionSeeder → Permisos de vehicles: view, manage, destroy
-    ├── Crea usuarios de prueba (admin, worker, client)
-    └── IncidenceSeeder        → Permisos de incidences + 10 incidencias faker
+DatabaseSeeder                              ← database/seeders/DatabaseSeeder.php
+├── 1. GlobalAdminSeeder                    ← database/seeders/GlobalAdminSeeder.php
+├── 2. PlanSeeder                           ← database/seeders/PlanSeeder.php
+└── 3. TenantSeeder                         ← database/seeders/TenantSeeder.php
+    └── Para cada tenant:
+        ├── Crea registro en public.tenants
+        ├── Crea dominio en public.domains
+        ├── CREATE SCHEMA tenant_X
+        ├── Ejecuta migraciones de tenant
+        ├── RolePermissionSeeder            ← database/seeders/RolePermissionSeeder.php
+        ├── PermissionSeeder                ← database/seeders/PermissionSeeder.php
+        ├── Crea usuarios de prueba (admin, worker, client)
+        └── Datos de prueba (faker)
+```
+
+Además, existe un seeder automático para cuando Stancl crea un tenant por su cuenta:
+
+```
+database/seeders/Tenant/TenantDatabaseSeeder.php   ← ejecutado por el pipeline de Stancl
+└── RoleSeeder.php                                  ← crea roles base
 ```
 
 ### Seeders detallados
@@ -563,9 +630,9 @@ Cada schema de tenant tiene sus propios roles (en su tabla `roles`):
 | `worker` | tenant | Trabajador, acceso a gestión operativa |
 | `client` | tenant | Cliente final, acceso limitado |
 
-### Permisos por módulo
+### Permisos por recurso
 
-#### Módulo User (`users.*`)
+#### Users (`users.*`)
 
 | Permiso | admin_tenant | worker | client |
 |---------|:---:|:---:|:---:|
@@ -573,7 +640,7 @@ Cada schema de tenant tiene sus propios roles (en su tabla `roles`):
 | `users.manage.all` | ✅ | ❌ | ❌ |
 | `users.destroy.all` | ✅ | ❌ | ❌ |
 
-#### Módulo Vehicle (`vehicles.*`)
+#### Vehicles (`vehicles.*`)
 
 | Permiso | admin_tenant | worker | client |
 |---------|:---:|:---:|:---:|
@@ -581,7 +648,7 @@ Cada schema de tenant tiene sus propios roles (en su tabla `roles`):
 | `vehicles.manage.all` | ✅ | ✅ | ❌ |
 | `vehicles.destroy.all` | ✅ | ❌ | ❌ |
 
-#### Módulo Incidences (`incidences.*`)
+#### Incidences (`incidences.*`)
 
 | Permiso | admin_tenant | worker | client |
 |---------|:---:|:---:|:---:|
@@ -591,7 +658,14 @@ Cada schema de tenant tiene sus propios roles (en su tabla `roles`):
 
 ### Policies
 
-Cada módulo tiene su propia Policy que usa los permisos definidos arriba:
+Cada recurso tiene su propia Policy en `app/Policies/` (estructura estándar de Laravel). Se crean con:
+
+```bash
+php artisan make:policy VehiclePolicy --model=Vehicle
+# → Se crea en app/Policies/VehiclePolicy.php
+```
+
+Cada policy usa los permisos definidos arriba:
 
 #### `UserPolicy`
 - **viewAny**: Requiere `users.view.all`
@@ -616,70 +690,16 @@ Cada módulo tiene su propia Policy que usa los permisos definidos arriba:
 
 ### Registro de policies
 
-Cada módulo tiene su `ServiceProvider` que registra la policy con `Gate::policy()`:
+Las policies se registran en `AppServiceProvider` (o en `AuthServiceProvider`) usando `Gate::policy()`:
 
 ```php
-// VehicleServiceProvider
+// app/Providers/AppServiceProvider.php → boot()
 Gate::policy(Vehicle::class, VehiclePolicy::class);
-
-// UserServiceProvider
 Gate::policy(User::class, UserPolicy::class);
-
-// IncidenceProviders
 Gate::policy(Incidence::class, IncidencePolicy::class);
 ```
 
----
-
-## Estructura de módulos
-
-Cada módulo sigue la misma estructura bajo `app/modules/`:
-
-```
-app/modules/
-├── Auth/
-│   ├── Controllers/
-│   ├── Providers/
-│   ├── Requests/
-│   ├── Routes/api.php
-│   └── Seeders/RolePermissionSeeder.php
-│
-├── Central/
-│   ├── Controllers/
-│   ├── Models/GlobalAdmin.php
-│   ├── Routes/api.php
-│   └── Seeders/GlobalAdminSeeder.php
-│
-├── User/
-│   ├── Controllers/UserController.php
-│   ├── Models/User.php
-│   ├── Policies/UserPolicy.php
-│   ├── Providers/UserServiceProvider.php
-│   ├── Requests/
-│   ├── Resources/
-│   ├── Routes/api.php
-│   └── Seeders/UserSeeder.php
-│
-├── Vehicle/
-│   ├── Controllers/VehicleController.php
-│   ├── Models/Vehicle.php
-│   ├── Policies/VehiclePolicy.php
-│   ├── Providers/VehicleServiceProvider.php
-│   ├── Requests/
-│   ├── Resources/
-│   ├── Routes/api.php
-│   └── Seeders/VehiclePermissionSeeder.php
-│
-└── Incidences/
-    ├── Controllers/IncidenceController.php
-    ├── Models/Incidence.php (+ Factory)
-    ├── Policies/IncidencePolicy.php
-    ├── Providers/IncidenceProviders.php
-    ├── Requests/
-    ├── Resources/
-    ├── Routes/api.php
-    └── Seeders/IncidenceSeeder.php
-```
+Laravel también soporta **auto-discovery** de policies si sigues la convención de nombres (`app/Policies/VehiclePolicy.php` para el modelo `app/Models/Vehicle.php`), en cuyo caso no necesitas registrarlas manualmente.
 
 ---
 
