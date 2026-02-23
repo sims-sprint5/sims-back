@@ -11,7 +11,7 @@ return new class extends Migration {
             $table->string('license_plate', 20)->unique();
             $table->string('brand', 100);
             $table->string('model', 100);
-            $table->year('year')->nullable();
+            $table->unsignedSmallInteger('year')->nullable();
             $table->string('color', 50)->nullable();
             $table->string('status', 30)->default('available')->comment('available, reserved, maintenance, inactive');
             $table->decimal('current_latitude', 10, 8)->nullable();
