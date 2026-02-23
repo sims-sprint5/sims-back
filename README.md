@@ -8,7 +8,7 @@
 | **PHP** | ^8.2 | Lenguaje de programación |
 | **Laravel** | ^12.0 | Framework backend |
 | **Laravel Sanctum** | ^4.0 | Autenticación API (Token-based) |
-| **MariaDB** | 11.2 | Base de datos relacional |
+| **PostgreSQL** | 16 | Base de datos relacional |
 | **Docker** | Latest | Contenedorización |
 | **Composer** | Latest | Gestión de dependencias PHP |
 | **PHPUnit** | ^11.5 | Testing unitario |
@@ -103,7 +103,7 @@ docker-compose up -d
 
 Esto levantará dos servicios:
 - **app**: Aplicación Laravel (puerto 8001)
-- **db**: Base de datos MariaDB (puerto 3306)
+- **db**: Base de datos PostgreSQL (puerto 5432)
 
 ### 4️⃣ Instalar dependencias
 
@@ -144,12 +144,12 @@ APP_DEBUG=true
 APP_URL=http://localhost:8001
 
 # Base de datos
-DB_CONNECTION=mysql
+DB_CONNECTION=pgsql
 DB_HOST=db
-DB_PORT=3306
-DB_DATABASE=blink_sprint4_equip3
-DB_USERNAME=root
-DB_PASSWORD=password
+DB_PORT=5432
+DB_DATABASE=sims
+DB_USERNAME=sims_user
+DB_PASSWORD=sims_password
 
 # Sanctum (autenticación)
 SANCTUM_STATEFUL_DOMAINS=localhost,127.0.0.1
