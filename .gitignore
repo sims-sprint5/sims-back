@@ -4,6 +4,7 @@
 /.env.backup
 /.env.production
 .env.*
+!.env.example
 
 # Composer vendor
 /vendor/
@@ -55,11 +56,8 @@ yarn-error.log*
 ### Misc / secrets ###
 /auth.json
 composer.phar
-composer.lock
 
 ### Docker ###
-DockerFile
-docker-compose.yml
 /.docker/
 
 ### Homestead ###
