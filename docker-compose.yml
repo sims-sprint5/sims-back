@@ -1,0 +1,73 @@
+version: '3.8'
+
+services:
+  # PostgreSQL 15 con PostGIS
+  postgres:
+    image: postgis/postgis:15-3.3
+    container_name: sims_postgres
+    environment:
+      POSTGRES_USER: ${DB_USERNAME:-sims_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-sims_password}
+      POSTGRES_DB: ${DB_DATABASE:-sims}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - sims_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-sims_user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # pgAdmin para gestión visual
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: sims_pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@example.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+    ports:
+      - "${PGADMIN_PORT:-5050}:80"
+    depends_on:
+      - postgres
+    networks:
+      - sims_network
+
+  # Laravel API
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sims_api
+    environment:
+      DB_CONNECTION: pgsql
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_DATABASE: ${DB_DATABASE:-sims}
+      DB_USERNAME: ${DB_USERNAME:-sims_user}
+      DB_PASSWORD: ${DB_PASSWORD:-sims_password}
+
+      APP_ENV: local
+      APP_DEBUG: true
+      APP_KEY: ${APP_KEY:-}
+      APP_URL: http://localhost:8000
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/var/www/html
+    depends_on:
+      - postgres
+    networks:
+      - sims_network
+    working_dir: /var/www/html
+    command: php artisan serve --host=0.0.0.0 --port=8000
+
+networks:
+  sims_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
