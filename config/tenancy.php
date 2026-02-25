@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 use Stancl\Tenancy\Database\Models\Domain;
 use Stancl\Tenancy\Database\Models\Tenant;
+use Stancl\Tenancy\Jobs;
+use Stancl\Tenancy\Listeners;
+use Stancl\Tenancy\Middleware;
 
 return [
     'tenant_model' => Tenant::class,
@@ -38,8 +41,10 @@ return [
     /**
      * Database tenancy config. Used by DatabaseTenancyBootstrapper.
      */
+    'tenant_database_manager' => Stancl\Tenancy\TenantDatabaseManagers\MySQLDatabaseManager::class,
+
     'database' => [
-        'central_connection' => env('DB_CONNECTION', 'central'),
+        'central_connection' => env('DB_CONNECTION', 'pgsql'),
 
         /**
          * Connection used as a "template" for the dynamically created tenant database connection.
