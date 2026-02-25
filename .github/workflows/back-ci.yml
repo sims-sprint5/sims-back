@@ -28,8 +28,17 @@ jobs:
       - name: Start PostgreSQL
         run: docker compose --env-file .env.ci up -d postgres
 
-      - name: Ensure bootstrap/cache dir exists
-        run: docker compose --env-file .env.ci run --rm api bash -lc "mkdir -p bootstrap/cache && chmod -R 775 bootstrap/cache"
+      - name: Ensure storage and cache dirs exist
+        run: |
+          docker compose --env-file .env.ci run --rm api bash -lc "
+            mkdir -p bootstrap/cache \
+              storage/logs \
+              storage/framework/cache \
+              storage/framework/sessions \
+              storage/framework/testing \
+              storage/framework/views \
+            && chmod -R 775 bootstrap/cache storage
+          "
 
       - name: Install dependencies
         run: docker compose --env-file .env.ci run --rm api composer install --prefer-dist --no-interaction --no-progress
