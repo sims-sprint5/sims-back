@@ -14,6 +14,7 @@ class TicketController extends Controller
     public function index()
     {
         $tickets = Ticket::with(['user', 'vehicle', 'reservation', 'assignedUser'])->get();
+
         return response()->json($tickets);
     }
 
@@ -35,7 +36,7 @@ class TicketController extends Controller
         ]);
 
         $ticket = Ticket::create($validated);
-        
+
         return response()->json($ticket->load(['user', 'vehicle', 'assignedUser']), 201);
     }
 
@@ -45,6 +46,7 @@ class TicketController extends Controller
     public function show(string $id)
     {
         $ticket = Ticket::with(['user', 'vehicle', 'reservation', 'assignedUser'])->findOrFail($id);
+
         return response()->json($ticket);
     }
 
@@ -54,7 +56,7 @@ class TicketController extends Controller
     public function update(Request $request, string $id)
     {
         $ticket = Ticket::findOrFail($id);
-        
+
         $validated = $request->validate([
             'user_id' => 'sometimes|exists:users,user_id',
             'vehicle_id' => 'nullable|exists:vehicles,vehicle_id',
@@ -68,7 +70,7 @@ class TicketController extends Controller
         ]);
 
         $ticket->update($validated);
-        
+
         return response()->json($ticket->load(['user', 'vehicle', 'assignedUser']));
     }
 
@@ -79,7 +81,7 @@ class TicketController extends Controller
     {
         $ticket = Ticket::findOrFail($id);
         $ticket->delete();
-        
+
         return response()->json(['message' => 'Ticket eliminado correctamente'], 200);
     }
 
@@ -91,7 +93,7 @@ class TicketController extends Controller
         $tickets = Ticket::where('user_id', $userId)
             ->with(['vehicle', 'reservation', 'assignedUser'])
             ->get();
-        
+
         return response()->json($tickets);
     }
 
@@ -101,13 +103,13 @@ class TicketController extends Controller
     public function assign(Request $request, string $id)
     {
         $ticket = Ticket::findOrFail($id);
-        
+
         $validated = $request->validate([
             'assigned_to' => 'required|exists:users,user_id',
         ]);
 
         $ticket->update($validated);
-        
+
         return response()->json($ticket->load('assignedUser'));
     }
 
@@ -117,13 +119,13 @@ class TicketController extends Controller
     public function updateStatus(Request $request, string $id)
     {
         $ticket = Ticket::findOrFail($id);
-        
+
         $validated = $request->validate([
             'status' => 'required|string|in:open,in_progress,resolved,closed',
         ]);
 
         $ticket->update($validated);
-        
+
         return response()->json($ticket);
     }
 }

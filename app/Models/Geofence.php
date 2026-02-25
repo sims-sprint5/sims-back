@@ -16,7 +16,7 @@ class Geofence extends Model
         'center_longitude',
         'radius',
         'polygon_coordinates',
-        'status'
+        'status',
     ];
 
     protected $casts = [

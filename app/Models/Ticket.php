@@ -17,7 +17,7 @@ class Ticket extends Model
         'description',
         'priority',
         'status',
-        'assigned_to'
+        'assigned_to',
     ];
 
     // Relaciones
@@ -41,4 +41,3 @@ class Ticket extends Model
         return $this->belongsTo(User::class, 'assigned_to', 'user_id');
     }
 }
-

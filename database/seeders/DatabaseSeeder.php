@@ -2,11 +2,11 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
-use App\Models\Vehicle;
+use App\Models\Geofence;
 use App\Models\Reservation;
 use App\Models\Ticket;
-use App\Models\Geofence;
+use App\Models\User;
+use App\Models\Vehicle;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;

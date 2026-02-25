@@ -16,6 +16,7 @@ class UserController extends Controller
     public function index()
     {
         $users = User::with(['tickets', 'reservations'])->get();
+
         return response()->json($users);
     }
 
@@ -34,9 +35,9 @@ class UserController extends Controller
         ]);
 
         $validated['password'] = Hash::make($validated['password']);
-        
+
         $user = User::create($validated);
-        
+
         return response()->json($user, 201);
     }
 
@@ -46,6 +47,7 @@ class UserController extends Controller
     public function show(string $id)
     {
         $user = User::with(['tickets', 'reservations'])->findOrFail($id);
+
         return response()->json($user);
     }
 
@@ -55,7 +57,7 @@ class UserController extends Controller
     public function update(Request $request, string $id)
     {
         $user = User::findOrFail($id);
-        
+
         $validated = $request->validate([
             'name' => 'sometimes|string|max:100',
             'email' => ['sometimes', 'email', 'max:100', Rule::unique('users')->ignore($user->user_id, 'user_id')],
@@ -70,7 +72,7 @@ class UserController extends Controller
         }
 
         $user->update($validated);
-        
+
         return response()->json($user);
     }
 
@@ -81,7 +83,7 @@ class UserController extends Controller
     {
         $user = User::findOrFail($id);
         $user->delete();
-        
+
         return response()->json(['message' => 'Usuario eliminado correctamente'], 200);
     }
 }

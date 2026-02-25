@@ -48,7 +48,7 @@ class AuthController extends Controller
                 ],
                 'access_token' => $token,
                 'token_type' => 'Bearer',
-            ]
+            ],
         ], 201);
     }
 
@@ -64,7 +64,7 @@ class AuthController extends Controller
 
         $user = User::where('email', $request->email)->first();
 
-        if (!$user || !Hash::check($request->password, $user->password)) {
+        if (! $user || ! Hash::check($request->password, $user->password)) {
             throw ValidationException::withMessages([
                 'email' => ['Las credenciales son incorrectas.'],
             ]);
@@ -96,7 +96,7 @@ class AuthController extends Controller
                 ],
                 'access_token' => $token,
                 'token_type' => 'Bearer',
-            ]
+            ],
         ]);
     }
 
@@ -120,7 +120,7 @@ class AuthController extends Controller
     public function me(Request $request)
     {
         $user = $request->user();
-        
+
         return response()->json([
             'success' => true,
             'data' => [
@@ -130,7 +130,7 @@ class AuthController extends Controller
                 'role' => $user->role,
                 'phone' => $user->phone,
                 'status' => $user->status,
-            ]
+            ],
         ]);
     }
 
@@ -160,7 +160,7 @@ class AuthController extends Controller
 
         $user = $request->user();
 
-        if (!Hash::check($validated['current_password'], $user->password)) {
+        if (! Hash::check($validated['current_password'], $user->password)) {
             throw ValidationException::withMessages([
                 'current_password' => ['La contraseña actual es incorrecta.'],
             ]);

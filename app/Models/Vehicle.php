@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class Vehicle extends Model
 {
     protected $table = 'vehicles';
+
     protected $primaryKey = 'vehicle_id';
 
     protected $fillable = [
@@ -18,7 +19,7 @@ class Vehicle extends Model
         'status',
         'current_latitude',
         'current_longitude',
-        'last_location_update'
+        'last_location_update',
     ];
 
     protected $casts = [

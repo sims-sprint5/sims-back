@@ -13,14 +13,14 @@ return new class extends Migration
     {
         Schema::create('vehicle_geofence_logs', function (Blueprint $table) {
             $table->id('log_id');
-            
+
             $table->foreignId('vehicle_id')
-                  ->constrained('vehicles', 'vehicle_id')
-                  ->onDelete('cascade');
+                ->constrained('vehicles', 'vehicle_id')
+                ->onDelete('cascade');
 
             $table->foreignId('geofence_id')
-                  ->constrained('geofences', 'geofence_id')
-                  ->onDelete('cascade');
+                ->constrained('geofences', 'geofence_id')
+                ->onDelete('cascade');
 
             $table->string('event_type', 50)->comment('entry, exit, violation');
             $table->timestamp('event_timestamp');
