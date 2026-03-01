@@ -12,7 +12,10 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        $middleware->priority([
+            \Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains::class,
+            \Stancl\Tenancy\Middleware\InitializeTenancyBySubdomain::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

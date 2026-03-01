@@ -3,13 +3,13 @@
 declare(strict_types=1);
 
 use Stancl\Tenancy\Database\Models\Domain;
-use Stancl\Tenancy\Database\Models\Tenant;
+use App\Models\Tenant;
 use Stancl\Tenancy\Jobs;
 use Stancl\Tenancy\Listeners;
 use Stancl\Tenancy\Middleware;
 
 return [
-    'tenant_model' => Tenant::class,
+    'tenant_model' => \App\Models\Tenant::class,
     'id_generator' => Stancl\Tenancy\UUIDGenerator::class,
 
     'domain_model' => Domain::class,
@@ -41,7 +41,7 @@ return [
     /**
      * Database tenancy config. Used by DatabaseTenancyBootstrapper.
      */
-    'tenant_database_manager' => Stancl\Tenancy\TenantDatabaseManagers\MySQLDatabaseManager::class,
+    'tenant_database_manager' => Stancl\Tenancy\TenantDatabaseManagers\PostgreSQLSchemaManager::class,
 
     'database' => [
         'central_connection' => env('DB_CONNECTION', 'pgsql'),
@@ -56,7 +56,7 @@ return [
          * Tenant database names are created like this:
          * prefix + tenant_id + suffix.
          */
-        'prefix' => 'tenant',
+        'prefix' => 'tenant_',
         'suffix' => '',
 
         /**
