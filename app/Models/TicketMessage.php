@@ -16,15 +16,23 @@ class TicketMessage extends Model
         'ticket_id',
         'sender_id',
         'message',
+        'is_admin',
     ];
 
     protected $casts = [
         'created_at' => 'datetime',
+        'is_admin'   => 'boolean',
     ];
 
     public function ticket()
     {
         return $this->belongsTo(Ticket::class, 'ticket_id', 'ticket_id');
+    }
+
+    /** Alias usado por el controlador para eager-loading */
+    public function user()
+    {
+        return $this->belongsTo(User::class, 'sender_id', 'user_id');
     }
 
     public function sender()

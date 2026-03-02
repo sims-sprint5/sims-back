@@ -30,25 +30,18 @@ Route::prefix('v1/auth')->group(function () {
     });
 });
 
-// ============================
-// RUTAS DE LA API (PROTEGIDAS)
-// ============================
 Route::middleware('auth:sanctum')->prefix('v1')->group(function () {
     
-    // Users - CRUD completo
     Route::apiResource('users', UserController::class);
-    
-    // Vehicles - CRUD completo
+
     Route::get('vehicles/{id}/reservations', [VehicleController::class, 'reservations'])->whereNumber('id');
     Route::patch('vehicles/{id}/location', [VehicleController::class, 'updateLocation'])->whereNumber('id');
     Route::apiResource('vehicles', VehicleController::class);
 
-    // Reservations - CRUD completo
     Route::get('reservations/user/{userId}', [ReservationController::class, 'byUser'])->whereNumber('userId');
     Route::patch('reservations/{id}/status', [ReservationController::class, 'updateStatus'])->whereNumber('id');
     Route::apiResource('reservations', ReservationController::class);
 
-    // Tickets - CRUD completo
     Route::get('tickets/user/{userId}', [TicketController::class, 'byUser'])->whereNumber('userId');
     Route::patch('tickets/{id}/assign', [TicketController::class, 'assign'])->whereNumber('id');
     Route::patch('tickets/{id}/status', [TicketController::class, 'updateStatus'])->whereNumber('id');
@@ -56,7 +49,6 @@ Route::middleware('auth:sanctum')->prefix('v1')->group(function () {
     Route::post('tickets/{ticket}/messages', [TicketMessageController::class, 'store'])->whereNumber('ticket');
     Route::apiResource('tickets', TicketController::class);
 
-    // Geofences - CRUD completo
     Route::post('geofences/check-vehicle', [GeofenceController::class, 'checkVehicle']);
     Route::get('geofences/{id}/logs', [GeofenceController::class, 'logs'])->whereNumber('id');
     Route::apiResource('geofences', GeofenceController::class);
