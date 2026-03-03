@@ -2,7 +2,7 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
+use App\Models\SuperAdmin;
 use Illuminate\Database\Seeder;
 
 class SuperAdminSeeder extends Seeder
@@ -12,6 +12,10 @@ class SuperAdminSeeder extends Seeder
      */
     public function run(): void
     {
-        //
+        SuperAdmin::create([
+            'name'     => 'Super Admin',
+            'email'    => 'superadmin@sims.com',
+            'password' => 'superadmin123', // Modificar-ho per utilitzar password del .env
+        ]);
     }
 }
