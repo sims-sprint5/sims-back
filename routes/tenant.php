@@ -24,21 +24,19 @@ use App\Http\Controllers\Api\GeofenceController;
 |
 */
 
-Route::middleware([
+Route::prefix('api')->middleware([
     'api',
     InitializeTenancyBySubdomain::class,
     PreventAccessFromCentralDomains::class,
 ])->group(function () {
 
-    // ============================
-    // AUTHENTICATION ROUTES
-    // ============================
+    Route::get('whoami', function () {
+        return response()->json(['tenant_id' => tenant('id'), 'tenant_name' => tenant('name')]);
+    });
+
     Route::prefix('v1/auth')->group(function () {
-        // Public routes (no authentication)
         Route::post('register', [AuthController::class, 'register']);
         Route::post('login', [AuthController::class, 'login']);
-
-        // Protected routes (require token)
         Route::middleware('auth:sanctum')->group(function () {
             Route::post('logout', [AuthController::class, 'logout']);
             Route::post('logout-all', [AuthController::class, 'logoutAll']);
@@ -47,31 +45,18 @@ Route::middleware([
         });
     });
 
-    // ============================
-    // API ROUTES (PROTECTED)
-    // ============================
     Route::middleware('auth:sanctum')->prefix('v1')->group(function () {
-
-        // Users
         Route::apiResource('users', UserController::class);
-
-        // Vehicles
         Route::apiResource('vehicles', VehicleController::class);
         Route::get('vehicles/{id}/reservations', [VehicleController::class, 'reservations']);
         Route::patch('vehicles/{id}/location', [VehicleController::class, 'updateLocation']);
-
-        // Reservations
         Route::get('reservations/user/{userId}', [ReservationController::class, 'byUser']);
         Route::patch('reservations/{id}/status', [ReservationController::class, 'updateStatus']);
         Route::apiResource('reservations', ReservationController::class);
-
-        // Tickets
         Route::get('tickets/user/{userId}', [TicketController::class, 'byUser']);
         Route::patch('tickets/{id}/assign', [TicketController::class, 'assign']);
         Route::patch('tickets/{id}/status', [TicketController::class, 'updateStatus']);
         Route::apiResource('tickets', TicketController::class);
-
-        // Geofences
         Route::apiResource('geofences', GeofenceController::class);
         Route::get('geofences/{id}/logs', [GeofenceController::class, 'logs']);
         Route::post('geofences/check-vehicle', [GeofenceController::class, 'checkVehicle']);
