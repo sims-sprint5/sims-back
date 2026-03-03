@@ -37,5 +37,5 @@ RUN composer install --no-dev --optimize-autoloader
 # 8️⃣ Exponer puerto
 EXPOSE 8000
 
-# 9️⃣ Comando por defecto
-CMD ["php-fpm"]
+# 9️⃣ Comando por defecto — Artisan dev server
+CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8000"]

@@ -61,15 +61,15 @@ Route::middleware([
         Route::patch('vehicles/{id}/location', [VehicleController::class, 'updateLocation']);
 
         // Reservations
-        Route::apiResource('reservations', ReservationController::class);
         Route::get('reservations/user/{userId}', [ReservationController::class, 'byUser']);
         Route::patch('reservations/{id}/status', [ReservationController::class, 'updateStatus']);
+        Route::apiResource('reservations', ReservationController::class);
 
         // Tickets
-        Route::apiResource('tickets', TicketController::class);
         Route::get('tickets/user/{userId}', [TicketController::class, 'byUser']);
         Route::patch('tickets/{id}/assign', [TicketController::class, 'assign']);
         Route::patch('tickets/{id}/status', [TicketController::class, 'updateStatus']);
+        Route::apiResource('tickets', TicketController::class);
 
         // Geofences
         Route::apiResource('geofences', GeofenceController::class);
