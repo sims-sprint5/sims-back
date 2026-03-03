@@ -16,30 +16,48 @@ class TenantController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'id'     => 'required|string|alpha_dash|unique:tenants,id',
-            'name'   => 'required|string|max:255',
+            'id'             => 'required|string|alpha_dash|unique:tenants,id|max:50',
+            'name'           => 'required|string|max:255',
+            'admin_name'     => 'nullable|string|max:255',
+            'admin_email'    => 'nullable|email|max:255',
+            'admin_password' => 'nullable|string|min:8',
         ]);
 
-        // Create tenant → automatically triggers CreateDatabase + MigrateDatabase
+        $tenantId = $request->id;
+
         $tenant = Tenant::create([
-            'id'   => $request->id,
+            'id'   => $tenantId,
             'name' => $request->name,
+            'data' => [
+                'admin_name'     => $request->admin_name     ?? 'Admin ' . ucfirst($tenantId),
+                'admin_email'    => $request->admin_email    ?? "admin@{$tenantId}.local",
+                'admin_password' => $request->admin_password ?? '',
+            ],
         ]);
 
-        // Add subdomain
-        $tenant->domains()->create(['domain' => $request->id]);
+        $tenant->domains()->create(['domain' => $tenantId]);
 
         return response()->json([
             'message' => 'Tenant creat correctament',
             'tenant'  => $tenant->load('domains'),
+            'access'  => [
+                'url'            => "http://{$tenantId}.localhost:8000",
+                'admin_email'    => $tenant->data['admin_email'],
+                'admin_password' => $request->admin_password ?? 'password123',
+            ],
         ], 201);
+    }
+
+    public function show(string $id)
+    {
+        $tenant = Tenant::with('domains')->findOrFail($id);
+        return response()->json($tenant);
     }
 
     public function destroy(string $id)
     {
         $tenant = Tenant::findOrFail($id);
-        $tenant->delete(); // Automatically triggers DeleteDatabase
-
-        return response()->json(['message' => 'Tenant deleted correctly.']);
+        $tenant->delete();
+        return response()->json(['message' => "Tenant '{$id}' eliminat correctament."]);
     }
 }

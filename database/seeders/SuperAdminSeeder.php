@@ -4,18 +4,18 @@ namespace Database\Seeders;
 
 use App\Models\SuperAdmin;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Hash;
 
 class SuperAdminSeeder extends Seeder
 {
-    /**
-     * Run the database seeds.
-     */
     public function run(): void
     {
-        SuperAdmin::create([
-            'name'     => 'Super Admin',
-            'email'    => 'superadmin@sims.com',
-            'password' => 'superadmin123', // Modificar-ho per utilitzar password del .env
-        ]);
+        SuperAdmin::firstOrCreate(
+            ['email' => env('SUPERADMIN_EMAIL')],
+            [
+                'name'     => env('SUPERADMIN_NAME'),
+                'password' => Hash::make(env('SUPERADMIN_PASSWORD', 'changeme')),
+            ]
+        );
     }
 }
