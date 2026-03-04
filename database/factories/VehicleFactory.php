@@ -18,7 +18,7 @@ class VehicleFactory extends Factory
             'model' => fake()->randomElement($models),
             'year' => fake()->numberBetween(2015, 2024),
             'color' => fake()->randomElement($colors),
-            'status' => fake()->randomElement(['available', 'maintenance', 'rented']),
+            'status' => fake()->randomElement(['available', 'reserved', 'maintenance', 'inactive']),
             'current_latitude' => fake()->latitude(41.35, 41.40),
             'current_longitude' => fake()->longitude(2.10, 2.20),
             'last_location_update' => now(),

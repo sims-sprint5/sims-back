@@ -20,7 +20,7 @@ class ReservationFactory extends Factory
             'end_date' => $endDate,
             'pickup_location' => fake()->randomElement(['Barcelona Airport', 'BCN Downtown', 'Port Vell', 'Gràcia']),
             'dropoff_location' => fake()->randomElement(['Barcelona Airport', 'BCN Downtown', 'Port Vell', 'Gràcia']),
-            'status' => fake()->randomElement(['pending', 'confirmed', 'active', 'completed', 'cancelled']),
+            'status' => fake()->randomElement(['pending', 'active', 'completed', 'cancelled']),
             'total_cost' => fake()->randomFloat(2, 50, 500),
         ];
     }

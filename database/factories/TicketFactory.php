@@ -15,10 +15,10 @@ class TicketFactory extends Factory
             'user_id'        => User::factory(),
             'vehicle_id'     => Vehicle::factory(),
             'reservation_id' => null,
-            'type'           => fake()->randomElement(['mechanical', 'damage', 'cleaning', 'fuel', 'other']),
+            'type'           => fake()->randomElement(['technical', 'billing', 'complaint', 'inquiry']),
             'subject'        => fake()->sentence(3),
             'description'    => fake()->paragraph(),
-            'priority'       => fake()->randomElement(['low', 'medium', 'high', 'critical']),
+            'priority'       => fake()->randomElement(['low', 'medium', 'high', 'urgent']),
             'status'         => fake()->randomElement(['open', 'in_progress', 'resolved', 'closed']),
             'assigned_to'    => null,
         ];

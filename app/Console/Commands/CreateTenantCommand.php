@@ -4,6 +4,8 @@ namespace App\Console\Commands;
 
 use App\Models\Tenant;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Log;
+use Stancl\Tenancy\Jobs\SeedDatabase;
 
 class CreateTenantCommand extends Command
 {
@@ -45,6 +47,13 @@ class CreateTenantCommand extends Command
         ]);
 
         $tenant->domains()->create(['domain' => $id]);
+
+        try {
+            SeedDatabase::dispatchSync($tenant);
+        } catch (\Throwable $e) {
+            $this->warn("  ⚠️  Seed parcial: " . $e->getMessage());
+            Log::error("Tenant seed failed for '{$id}': " . $e->getMessage());
+        }
 
         $this->newLine();
         $this->line("  ✅ Schema PostgreSQL: <info>tenant_{$id}</info>");

@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Central;
 use App\Http\Controllers\Controller;
 use App\Models\Tenant;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Stancl\Tenancy\Jobs\SeedDatabase;
 
 class TenantController extends Controller
 {
@@ -25,27 +27,34 @@ class TenantController extends Controller
 
         $tenantId = $request->id;
 
-        // 'name' must live inside the 'data' JSON column.
-        // Passing it as a top-level key alongside 'data' causes Eloquent to
-        // overwrite the JSON that stancl already set, so 'name' is lost.
+        $adminEmail = $request->admin_email ?? "admin@{$tenantId}.local";
+
         $tenant = Tenant::create([
             'id'   => $tenantId,
             'data' => [
                 'name'           => $request->name,
-                'admin_name'     => $request->admin_name     ?? 'Admin ' . ucfirst($tenantId),
-                'admin_email'    => $request->admin_email    ?? "admin@{$tenantId}.local",
+                'admin_name'     => $request->admin_name ?? 'Admin ' . ucfirst($tenantId),
+                'admin_email'    => $adminEmail,
                 'admin_password' => $request->admin_password ?? '',
             ],
         ]);
 
         $tenant->domains()->create(['domain' => $tenantId]);
 
+        // Run seed explicitly (isolated from schema+migrate pipeline).
+        // A seed failure is logged but does not block the 201 response.
+        try {
+            SeedDatabase::dispatchSync($tenant);
+        } catch (\Throwable $e) {
+            Log::error("Tenant seed failed for '{$tenantId}': " . $e->getMessage());
+        }
+
         return response()->json([
             'message' => 'Tenant creat correctament',
             'tenant'  => $tenant->load('domains'),
             'access'  => [
                 'url'         => "http://{$tenantId}.localhost:8000",
-                'admin_email' => $tenant->data['admin_email'],
+                'admin_email' => $adminEmail,
             ],
         ], 201);
     }
