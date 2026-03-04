@@ -79,7 +79,7 @@ class VehicleController extends Controller
         $vehicle = Vehicle::findOrFail($id);
         $vehicle->delete();
 
-        return response()->json(['message' => 'Vehículo eliminado correctamente'], 200);
+        return response()->json(['message' => 'Vehicle deleted successfully'], 200);
     }
 
     /**

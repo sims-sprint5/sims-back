@@ -18,8 +18,8 @@ class ReservationFactory extends Factory
             'vehicle_id' => Vehicle::factory(),
             'start_date' => $startDate,
             'end_date' => $endDate,
-            'pickup_location' => fake()->randomElement(['Barcelona Airport', 'BCN Downtown', 'Port Vell', 'Gràcia']),
-            'dropoff_location' => fake()->randomElement(['Barcelona Airport', 'BCN Downtown', 'Port Vell', 'Gràcia']),
+            'pickup_location' => fake()->randomElement(['Main Station', 'City Center', 'Airport Terminal', 'North Hub']),
+            'dropoff_location' => fake()->randomElement(['Main Station', 'City Center', 'Airport Terminal', 'North Hub']),
             'status' => fake()->randomElement(['pending', 'active', 'completed', 'cancelled']),
             'total_cost' => fake()->randomFloat(2, 50, 500),
         ];

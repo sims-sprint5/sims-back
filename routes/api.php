@@ -8,7 +8,7 @@ use App\Http\Controllers\Central\TenantController;
 // Health check
 Route::get('/ping', fn() => response()->json(['status' => 'ok', 'timestamp' => now()]));
 
-// Auth SuperAdmin (public)
+// SuperAdmin public auth routes
 Route::prefix('v1/superadmin/auth')->group(function () {
     Route::post('login', [SuperAdminAuthController::class, 'login']);
 });

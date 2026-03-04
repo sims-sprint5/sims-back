@@ -8,19 +8,19 @@ use Illuminate\Console\Command;
 class ListTenantsCommand extends Command
 {
     protected $signature = 'tenant:list';
-    protected $description = 'Llista tots els tenants actius amb els seus dominis';
+    protected $description = 'List all tenants with their assigned domains';
 
     public function handle(): int
     {
         $tenants = Tenant::with('domains')->get();
 
         if ($tenants->isEmpty()) {
-            $this->warn('No hi ha tenants creats encara.');
+            $this->warn('No tenants found.');
             return Command::SUCCESS;
         }
 
         $this->table(
-            ['ID', 'Nom', 'Domini', 'Creat'],
+            ['ID', 'Name', 'Domain', 'Created'],
             $tenants->map(fn ($t) => [
                 $t->id,
                 $t->name ?? '-',

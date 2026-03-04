@@ -81,7 +81,7 @@ class TicketController extends Controller
         $ticket = Ticket::findOrFail($id);
         $ticket->delete();
 
-        return response()->json(['message' => 'Ticket eliminado correctamente'], 200);
+        return response()->json(['message' => 'Ticket deleted successfully'], 200);
     }
 
     /**

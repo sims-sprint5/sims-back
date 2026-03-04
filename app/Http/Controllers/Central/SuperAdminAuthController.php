@@ -19,7 +19,7 @@ class SuperAdminAuthController extends Controller
         $superadmin = SuperAdmin::where('email', $request->email)->first();
 
         if (!$superadmin || !Hash::check($request->password, $superadmin->password)) {
-            return response()->json(['message' => 'Credencials incorrectes'], 401);
+            return response()->json(['message' => 'Invalid credentials'], 401);
         }
 
         $token = $superadmin->createToken('superadmin-token')->plainTextToken;
@@ -34,7 +34,7 @@ class SuperAdminAuthController extends Controller
     {
         $request->user()->currentAccessToken()->delete();
 
-        return response()->json(['message' => 'Sessió tancada correctament']);
+        return response()->json(['message' => 'Logged out successfully']);
     }
 
     public function me(Request $request)

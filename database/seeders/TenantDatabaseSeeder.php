@@ -17,7 +17,7 @@ class TenantDatabaseSeeder extends Seeder
         $tenantId = tenant('id');
         $data     = tenant('data') ?? [];
 
-        // Admin personalitzat o per defecte
+        // Default admin or custom one provided at tenant creation time.
         $adminName     = $data['admin_name']     ?? 'Admin ' . ucfirst($tenantId);
         $adminEmail    = $data['admin_email']    ?? "admin@{$tenantId}.local";
         $adminPassword = $data['admin_password'] ?? 'password123';
@@ -51,7 +51,7 @@ class TenantDatabaseSeeder extends Seeder
         }
 
         Geofence::factory()->count(5)->create();
-        
+
         $currentTenant = \App\Models\Tenant::find(tenant('id'));
         $data = $currentTenant->data ?? [];
         unset($data['admin_password']);

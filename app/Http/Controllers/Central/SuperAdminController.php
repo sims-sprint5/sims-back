@@ -42,11 +42,11 @@ class SuperAdminController extends Controller
 
         if ($admin->email === env('SUPERADMIN_EMAIL')) {
             return response()->json([
-                'message' => 'No es pot eliminar el SuperAdmin principal.',
+                'message' => 'The primary SuperAdmin cannot be deleted.',
             ], 403);
         }
 
         $admin->delete();
-        return response()->json(['message' => 'SuperAdmin eliminat correctament.']);
+        return response()->json(['message' => 'SuperAdmin deleted successfully.']);
     }
 }

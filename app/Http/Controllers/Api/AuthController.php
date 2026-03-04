@@ -11,7 +11,7 @@ use Illuminate\Validation\ValidationException;
 class AuthController extends Controller
 {
     /**
-     * Registro de nuevo usuario
+     * Register a new user.
      */
     public function register(Request $request)
     {
@@ -36,7 +36,7 @@ class AuthController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Usuario registrado exitosamente',
+            'message' => 'User registered successfully',
             'data' => [
                 'user' => [
                     'user_id' => $user->user_id,
@@ -53,7 +53,7 @@ class AuthController extends Controller
     }
 
     /**
-     * Login de usuario
+     * Authenticate a user and return a token.
      */
     public function login(Request $request)
     {
@@ -66,25 +66,25 @@ class AuthController extends Controller
 
         if (!$user || !Hash::check($request->password, $user->password)) {
             throw ValidationException::withMessages([
-                'email' => ['Las credenciales son incorrectas.'],
+                'email' => ['The provided credentials are incorrect.'],
             ]);
         }
 
         if ($user->status !== 'active') {
             return response()->json([
                 'success' => false,
-                'message' => 'Usuario inactivo. Contacte al administrador.',
+                'message' => 'Account is inactive. Please contact your administrator.',
             ], 403);
         }
 
-        // Revocar tokens anteriores (opcional)
+        // Revoke all previous tokens before issuing a new one.
         $user->tokens()->delete();
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
             'success' => true,
-            'message' => 'Login exitoso',
+            'message' => 'Login successful',
             'data' => [
                 'user' => [
                     'user_id' => $user->user_id,
@@ -101,21 +101,21 @@ class AuthController extends Controller
     }
 
     /**
-     * Logout de usuario
+     * Revoke the current access token (logout).
      */
     public function logout(Request $request)
     {
-        // Revocar el token actual
+        // Revoke only the current token.
         $request->user()->currentAccessToken()->delete();
 
         return response()->json([
             'success' => true,
-            'message' => 'Sesión cerrada exitosamente',
+            'message' => 'Logged out successfully',
         ]);
     }
 
     /**
-     * Obtener usuario autenticado
+     * Return the authenticated user's profile.
      */
     public function me(Request $request)
     {
@@ -135,21 +135,21 @@ class AuthController extends Controller
     }
 
     /**
-     * Revocar todos los tokens del usuario
+     * Revoke all tokens for the authenticated user (logout from all devices).
      */
     public function logoutAll(Request $request)
     {
-        // Revocar todos los tokens del usuario
+        // Revoke every token belonging to this user.
         $request->user()->tokens()->delete();
 
         return response()->json([
             'success' => true,
-            'message' => 'Todas las sesiones cerradas exitosamente',
+            'message' => 'All sessions logged out successfully',
         ]);
     }
 
     /**
-     * Cambiar contraseña
+     * Change the authenticated user's password.
      */
     public function changePassword(Request $request)
     {
@@ -162,7 +162,7 @@ class AuthController extends Controller
 
         if (!Hash::check($validated['current_password'], $user->password)) {
             throw ValidationException::withMessages([
-                'current_password' => ['La contraseña actual es incorrecta.'],
+                'current_password' => ['The current password is incorrect.'],
             ]);
         }
 
@@ -170,12 +170,12 @@ class AuthController extends Controller
             'password' => Hash::make($validated['new_password']),
         ]);
 
-        // Revocar todos los tokens excepto el actual
+        // Revoke all other tokens except the current one.
         $user->tokens()->where('id', '!=', $request->user()->currentAccessToken()->id)->delete();
 
         return response()->json([
             'success' => true,
-            'message' => 'Contraseña actualizada exitosamente',
+            'message' => 'Password updated successfully',
         ]);
     }
 }

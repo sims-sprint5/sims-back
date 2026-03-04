@@ -25,9 +25,14 @@ class TenantController extends Controller
             'admin_password' => 'nullable|string|min:8',
         ]);
 
-        $tenantId = $request->id;
+        $tenantId   = $request->id;
+        $baseDomain = env('TENANT_BASE_DOMAIN', 'localhost');
 
-        $adminEmail = $request->admin_email ?? "admin@{$tenantId}.local";
+        $parsed     = parse_url(config('app.url'));
+        $scheme     = $parsed['scheme'] ?? 'http';
+        $port       = isset($parsed['port']) ? ':' . $parsed['port'] : '';
+
+        $adminEmail = $request->admin_email ?? "admin@{$tenantId}.{$baseDomain}";
 
         $tenant = Tenant::create([
             'id'   => $tenantId,
@@ -39,7 +44,7 @@ class TenantController extends Controller
             ],
         ]);
 
-        $tenant->domains()->create(['domain' => $tenantId]);
+        $tenant->domains()->create(['domain' => "{$tenantId}.{$baseDomain}"]);
 
         // Run seed explicitly (isolated from schema+migrate pipeline).
         // A seed failure is logged but does not block the 201 response.
@@ -50,10 +55,10 @@ class TenantController extends Controller
         }
 
         return response()->json([
-            'message' => 'Tenant creat correctament',
+            'message' => 'Tenant created successfully',
             'tenant'  => $tenant->load('domains'),
             'access'  => [
-                'url'         => "http://{$tenantId}.localhost:8000",
+                'url'         => "{$scheme}://{$tenantId}.{$baseDomain}{$port}",
                 'admin_email' => $adminEmail,
             ],
         ], 201);
@@ -69,6 +74,6 @@ class TenantController extends Controller
     {
         $tenant = Tenant::findOrFail($id);
         $tenant->delete();
-        return response()->json(['message' => "Tenant '{$id}' eliminat correctament."]);
+        return response()->json(['message' => "Tenant '{$id}' deleted successfully."]);
     }
 }

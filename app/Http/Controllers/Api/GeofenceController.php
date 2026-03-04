@@ -81,7 +81,7 @@ class GeofenceController extends Controller
         $geofence = Geofence::findOrFail($id);
         $geofence->delete();
 
-        return response()->json(['message' => 'Geofence eliminada correctamente'], 200);
+        return response()->json(['message' => 'Geofence deleted successfully'], 200);
     }
 
     /**
@@ -145,7 +145,7 @@ class GeofenceController extends Controller
      */
     private function calculateDistance($lat1, $lon1, $lat2, $lon2)
     {
-        $earthRadius = 6371000; // metros
+        $earthRadius = 6371000; // metres
 
         $dLat = deg2rad($lat2 - $lat1);
         $dLon = deg2rad($lon2 - $lon1);
