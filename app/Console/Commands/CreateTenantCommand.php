@@ -32,10 +32,12 @@ class CreateTenantCommand extends Command
 
         $this->info("Creant tenant '{$name}' ({$id})...");
 
+        // 'name' must be stored inside the 'data' JSON to avoid the key being
+        // silently overwritten when both 'name' and 'data' are passed together.
         $tenant = Tenant::create([
             'id'   => $id,
-            'name' => $name,
             'data' => [
+                'name'           => $name,
                 'admin_name'     => $adminName,
                 'admin_email'    => $adminEmail,
                 'admin_password' => $adminPassword,

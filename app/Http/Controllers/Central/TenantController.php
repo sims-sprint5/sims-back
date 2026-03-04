@@ -25,10 +25,13 @@ class TenantController extends Controller
 
         $tenantId = $request->id;
 
+        // 'name' must live inside the 'data' JSON column.
+        // Passing it as a top-level key alongside 'data' causes Eloquent to
+        // overwrite the JSON that stancl already set, so 'name' is lost.
         $tenant = Tenant::create([
             'id'   => $tenantId,
-            'name' => $request->name,
             'data' => [
+                'name'           => $request->name,
                 'admin_name'     => $request->admin_name     ?? 'Admin ' . ucfirst($tenantId),
                 'admin_email'    => $request->admin_email    ?? "admin@{$tenantId}.local",
                 'admin_password' => $request->admin_password ?? '',
@@ -41,9 +44,8 @@ class TenantController extends Controller
             'message' => 'Tenant creat correctament',
             'tenant'  => $tenant->load('domains'),
             'access'  => [
-                'url'            => "http://{$tenantId}.localhost:8000",
-                'admin_email'    => $tenant->data['admin_email'],
-                'admin_password' => $request->admin_password ?? 'password123',
+                'url'         => "http://{$tenantId}.localhost:8000",
+                'admin_email' => $tenant->data['admin_email'],
             ],
         ], 201);
     }

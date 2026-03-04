@@ -12,9 +12,14 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Tenancy must initialize before access-prevention check
         $middleware->priority([
-            \Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains::class,
             \Stancl\Tenancy\Middleware\InitializeTenancyBySubdomain::class,
+            \Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains::class,
+        ]);
+
+        $middleware->alias([
+            'ensure.superadmin' => \App\Http\Middleware\EnsureSuperAdmin::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

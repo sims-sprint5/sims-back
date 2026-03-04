@@ -11,9 +11,10 @@ class VehicleController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $vehicles = Vehicle::with(['reservations'])->get();
+        $perPage = $request->integer('per_page', 15);
+        $vehicles = Vehicle::with(['reservations'])->paginate($perPage);
         return response()->json($vehicles);
     }
 
@@ -34,7 +35,7 @@ class VehicleController extends Controller
         ]);
 
         $vehicle = Vehicle::create($validated);
-        
+
         return response()->json($vehicle, 201);
     }
 
@@ -53,7 +54,7 @@ class VehicleController extends Controller
     public function update(Request $request, string $id)
     {
         $vehicle = Vehicle::findOrFail($id);
-        
+
         $validated = $request->validate([
             'license_plate' => 'sometimes|string|max:20|unique:vehicles,license_plate,' . $id . ',vehicle_id',
             'brand' => 'sometimes|string|max:100',
@@ -66,7 +67,7 @@ class VehicleController extends Controller
         ]);
 
         $vehicle->update($validated);
-        
+
         return response()->json($vehicle);
     }
 
@@ -77,7 +78,7 @@ class VehicleController extends Controller
     {
         $vehicle = Vehicle::findOrFail($id);
         $vehicle->delete();
-        
+
         return response()->json(['message' => 'Vehículo eliminado correctamente'], 200);
     }
 
@@ -88,7 +89,7 @@ class VehicleController extends Controller
     {
         $vehicle = Vehicle::findOrFail($id);
         $reservations = $vehicle->reservations()->with('user')->get();
-        
+
         return response()->json($reservations);
     }
 
@@ -98,7 +99,7 @@ class VehicleController extends Controller
     public function updateLocation(Request $request, string $id)
     {
         $vehicle = Vehicle::findOrFail($id);
-        
+
         $validated = $request->validate([
             'latitude' => 'required|numeric|between:-90,90',
             'longitude' => 'required|numeric|between:-180,180',
@@ -109,7 +110,7 @@ class VehicleController extends Controller
             'current_longitude' => $validated['longitude'],
             'last_location_update' => now(),
         ]);
-        
+
         return response()->json($vehicle);
     }
 }

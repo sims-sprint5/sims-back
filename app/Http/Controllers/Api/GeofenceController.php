@@ -13,9 +13,10 @@ class GeofenceController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $geofences = Geofence::all();
+        $perPage = $request->integer('per_page', 15);
+        $geofences = Geofence::paginate($perPage);
         return response()->json($geofences);
     }
 
@@ -36,7 +37,7 @@ class GeofenceController extends Controller
         ]);
 
         $geofence = Geofence::create($validated);
-        
+
         return response()->json($geofence, 201);
     }
 
@@ -55,7 +56,7 @@ class GeofenceController extends Controller
     public function update(Request $request, string $id)
     {
         $geofence = Geofence::findOrFail($id);
-        
+
         $validated = $request->validate([
             'name' => 'sometimes|string|max:100',
             'description' => 'nullable|string',
@@ -68,7 +69,7 @@ class GeofenceController extends Controller
         ]);
 
         $geofence->update($validated);
-        
+
         return response()->json($geofence);
     }
 
@@ -79,7 +80,7 @@ class GeofenceController extends Controller
     {
         $geofence = Geofence::findOrFail($id);
         $geofence->delete();
-        
+
         return response()->json(['message' => 'Geofence eliminada correctamente'], 200);
     }
 
@@ -90,7 +91,7 @@ class GeofenceController extends Controller
     {
         $geofence = Geofence::findOrFail($id);
         $logs = $geofence->vehicleLogs()->with('vehicle')->orderBy('event_timestamp', 'desc')->get();
-        
+
         return response()->json($logs);
     }
 
@@ -107,9 +108,9 @@ class GeofenceController extends Controller
 
         $vehicle = Vehicle::findOrFail($validated['vehicle_id']);
         $geofences = Geofence::where('status', 'active')->get();
-        
+
         $insideGeofences = [];
-        
+
         foreach ($geofences as $geofence) {
             $distance = $this->calculateDistance(
                 $validated['latitude'],
@@ -117,10 +118,10 @@ class GeofenceController extends Controller
                 $geofence->center_latitude,
                 $geofence->center_longitude
             );
-            
+
             if ($distance <= $geofence->radius) {
                 $insideGeofences[] = $geofence;
-                
+
                 // Log the event
                 VehicleGeofenceLog::create([
                     'vehicle_id' => $vehicle->vehicle_id,
@@ -132,7 +133,7 @@ class GeofenceController extends Controller
                 ]);
             }
         }
-        
+
         return response()->json([
             'vehicle' => $vehicle,
             'inside_geofences' => $insideGeofences,
@@ -145,16 +146,16 @@ class GeofenceController extends Controller
     private function calculateDistance($lat1, $lon1, $lat2, $lon2)
     {
         $earthRadius = 6371000; // metros
-        
+
         $dLat = deg2rad($lat2 - $lat1);
         $dLon = deg2rad($lon2 - $lon1);
-        
+
         $a = sin($dLat/2) * sin($dLat/2) +
              cos(deg2rad($lat1)) * cos(deg2rad($lat2)) *
              sin($dLon/2) * sin($dLon/2);
-        
+
         $c = 2 * atan2(sqrt($a), sqrt(1-$a));
-        
+
         return $earthRadius * $c;
     }
 }

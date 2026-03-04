@@ -32,13 +32,13 @@ class SuperAdminAuthController extends Controller
 
     public function logout(Request $request)
     {
-        $request->user('superadmins')->currentAccessToken()->delete();
+        $request->user()->currentAccessToken()->delete();
 
         return response()->json(['message' => 'Sessió tancada correctament']);
     }
 
     public function me(Request $request)
     {
-        return response()->json($request->user('superadmins'));
+        return response()->json($request->user());
     }
 }

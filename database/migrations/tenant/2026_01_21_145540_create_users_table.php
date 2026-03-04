@@ -11,10 +11,12 @@ return new class extends Migration {
             $table->id('user_id');
             $table->string('name', 100);
             $table->string('email', 100)->unique();
+            $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
-            $table->string('role', 50)->comment('admin, user, manager');
+            $table->string('role', 50)->comment('admin, manager, user, technical');
             $table->string('phone', 20)->nullable();
             $table->string('status', 20)->default('active')->comment('active, inactive, suspended');
+            $table->rememberToken();
             $table->timestamps();
         });
     }

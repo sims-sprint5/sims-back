@@ -11,9 +11,10 @@ class ReservationController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $reservations = Reservation::with(['user', 'vehicle'])->get();
+        $perPage = $request->integer('per_page', 15);
+        $reservations = Reservation::with(['user', 'vehicle'])->paginate($perPage);
         return response()->json($reservations);
     }
 
@@ -34,7 +35,7 @@ class ReservationController extends Controller
         ]);
 
         $reservation = Reservation::create($validated);
-        
+
         return response()->json($reservation->load(['user', 'vehicle']), 201);
     }
 
@@ -53,7 +54,7 @@ class ReservationController extends Controller
     public function update(Request $request, string $id)
     {
         $reservation = Reservation::findOrFail($id);
-        
+
         $validated = $request->validate([
             'user_id' => 'sometimes|exists:users,user_id',
             'vehicle_id' => 'sometimes|exists:vehicles,vehicle_id',
@@ -66,7 +67,7 @@ class ReservationController extends Controller
         ]);
 
         $reservation->update($validated);
-        
+
         return response()->json($reservation->load(['user', 'vehicle']));
     }
 
@@ -77,7 +78,7 @@ class ReservationController extends Controller
     {
         $reservation = Reservation::findOrFail($id);
         $reservation->delete();
-        
+
         return response()->json(['message' => 'Reserva eliminada correctamente'], 200);
     }
 
@@ -89,7 +90,7 @@ class ReservationController extends Controller
         $reservations = Reservation::where('user_id', $userId)
             ->with(['vehicle'])
             ->get();
-        
+
         return response()->json($reservations);
     }
 
@@ -99,13 +100,13 @@ class ReservationController extends Controller
     public function updateStatus(Request $request, string $id)
     {
         $reservation = Reservation::findOrFail($id);
-        
+
         $validated = $request->validate([
             'status' => 'required|string|in:pending,active,completed,cancelled',
         ]);
 
         $reservation->update($validated);
-        
+
         return response()->json($reservation);
     }
 }
