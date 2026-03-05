@@ -17,11 +17,9 @@ Route::get('/ping', function() {
     return response()->json(['message' => 'API is working']);
 });
 Route::prefix('v1/auth')->group(function () {
-    // Rutas públicas (sin autenticación)
     Route::post('register', [AuthController::class, 'register']);
     Route::post('login', [AuthController::class, 'login']);
     
-    // Rutas protegidas (requieren autenticación)
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('logout', [AuthController::class, 'logout']);
         Route::post('logout-all', [AuthController::class, 'logoutAll']);
