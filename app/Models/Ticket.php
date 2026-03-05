@@ -43,4 +43,9 @@ class Ticket extends Model
     {
         return $this->belongsTo(User::class, 'assigned_to', 'user_id');
     }
+
+    public function messages()
+    {
+        return $this->hasMany(TicketMessage::class, 'ticket_id', 'ticket_id');
+    }
 }

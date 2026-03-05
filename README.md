@@ -108,25 +108,25 @@ Esto levantará dos servicios:
 ### 4️⃣ Instalar dependencias
 
 ```bash
-docker exec -it laravel_app composer install
+docker exec -it sims_api composer install
 ```
 
 ### 5️⃣ Generar key de la aplicación
 
 ```bash
-docker exec -it laravel_app php artisan key:generate
+docker exec -it sims_api php artisan key:generate
 ```
 
 ### 6️⃣ Ejecutar migraciones
 
 ```bash
-docker exec -it laravel_app php artisan migrate
+docker exec -it sims_api php artisan migrate
 ```
 
 ### 7️⃣ (Opcional) Poblar base de datos con datos de prueba
 
 ```bash
-docker exec -it laravel_app php artisan db:seed
+docker exec -it sims_api php artisan db:seed
 ```
 
 ---
