@@ -15,12 +15,12 @@ class TenantDatabaseSeeder extends Seeder
     public function run(): void
     {
         $tenantId = tenant('id');
-        $data     = tenant('data') ?? [];
 
-        // Default admin or custom one provided at tenant creation time.
-        $adminName     = $data['admin_name']     ?? 'Admin ' . ucfirst($tenantId);
-        $adminEmail    = $data['admin_email']    ?? "admin@{$tenantId}.local";
-        $adminPassword = $data['admin_password'] ?? 'password123';
+        // Custom fields are stored as top-level attributes on the tenant model
+        // and accessed via the tenant() helper.
+        $adminName     = tenant('admin_name')     ?? 'Admin ' . ucfirst($tenantId);
+        $adminEmail    = tenant('admin_email')    ?? "admin@{$tenantId}.local";
+        $adminPassword = tenant('admin_password') ?? 'password123';
 
         $admin = User::create([
             'name'     => $adminName,
@@ -52,9 +52,8 @@ class TenantDatabaseSeeder extends Seeder
 
         Geofence::factory()->count(5)->create();
 
+        // Remove the plain-text password from the tenant record.
         $currentTenant = \App\Models\Tenant::find(tenant('id'));
-        $data = $currentTenant->data ?? [];
-        unset($data['admin_password']);
-        $currentTenant->update(['data' => $data]);
+        $currentTenant->update(['admin_password' => null]);
     }
 }

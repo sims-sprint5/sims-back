@@ -35,23 +35,28 @@ class TenantController extends Controller
         $adminEmail = $request->admin_email ?? "admin@{$tenantId}.{$baseDomain}";
 
         $tenant = Tenant::create([
-            'id'   => $tenantId,
-            'data' => [
-                'name'           => $request->name,
-                'admin_name'     => $request->admin_name ?? 'Admin ' . ucfirst($tenantId),
-                'admin_email'    => $adminEmail,
-                'admin_password' => $request->admin_password ?? '',
-            ],
+            'id'             => $tenantId,
+            'name'           => $request->name,
+            'admin_name'     => $request->admin_name ?? 'Admin ' . ucfirst($tenantId),
+            'admin_email'    => $adminEmail,
+            'admin_password' => $request->admin_password ?? '',
         ]);
 
-        $tenant->domains()->create(['domain' => "{$tenantId}.{$baseDomain}"]);
+        $tenant->domains()->create(['domain' => $tenantId]);
 
         // Run seed explicitly (isolated from schema+migrate pipeline).
-        // A seed failure is logged but does not block the 201 response.
+        // If the seed fails, roll back the tenant creation so the DB stays
+        // consistent and the caller receives a clear 500 error instead of a
+        // silent partial-success.
         try {
             SeedDatabase::dispatchSync($tenant);
         } catch (\Throwable $e) {
             Log::error("Tenant seed failed for '{$tenantId}': " . $e->getMessage());
+            $tenant->delete();
+            return response()->json([
+                'message' => 'Tenant creation failed during database seeding.',
+                'error'   => $e->getMessage(),
+            ], 500);
         }
 
         return response()->json([

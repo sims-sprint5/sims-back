@@ -1,0 +1,56 @@
+name: Tenant Tests
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgis/postgis:15-3.3
+        env:
+          POSTGRES_USER: sims_user
+          POSTGRES_PASSWORD: sims_password
+          POSTGRES_DB: sims
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          extensions: pdo, pdo_pgsql, pgsql
+          coverage: none
+
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --prefer-dist --optimize-autoloader
+
+      - name: Run central migrations
+        run: php artisan migrate --force
+        env:
+          APP_KEY: base64:0oErKnFKzAbeLxI4ZJlz/+SjtNUgaEo5OCJx251zLmk=
+          DB_CONNECTION: pgsql
+          DB_HOST: 127.0.0.1   # service containers are at localhost/127.0.0.1 on the GH Actions runner
+          DB_PORT: 5432
+          DB_DATABASE: sims
+          DB_USERNAME: sims_user
+          DB_PASSWORD: sims_password
+
+      - name: Run tenant tests
+        run: ./vendor/bin/phpunit --configuration=phpunit.tenants.xml
+        env:
+          DB_HOST: 127.0.0.1   # overrides the 'postgres' value in phpunit.tenants.xml

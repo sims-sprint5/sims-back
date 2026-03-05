@@ -37,7 +37,7 @@ Route::prefix('api')->middleware([
     Route::prefix('v1/auth')->group(function () {
         Route::post('register', [AuthController::class, 'register']);
         Route::post('login', [AuthController::class, 'login']);
-        Route::middleware('auth:sanctum')->group(function () {
+        Route::middleware(['auth:sanctum', 'ensure.tenant'])->group(function () {
             Route::post('logout', [AuthController::class, 'logout']);
             Route::post('logout-all', [AuthController::class, 'logoutAll']);
             Route::get('me', [AuthController::class, 'me']);
@@ -45,7 +45,7 @@ Route::prefix('api')->middleware([
         });
     });
 
-    Route::middleware('auth:sanctum')->prefix('v1')->group(function () {
+    Route::middleware(['auth:sanctum', 'ensure.tenant'])->prefix('v1')->group(function () {
         Route::apiResource('users', UserController::class);
         Route::apiResource('vehicles', VehicleController::class);
         Route::get('vehicles/{id}/reservations', [VehicleController::class, 'reservations']);

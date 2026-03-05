@@ -11,20 +11,18 @@ use Stancl\Tenancy\Database\Concerns\HasDomains;
  * All custom fields (name, admin_name, admin_email …) are stored inside the
  * JSON `data` column via stancl's magic getAttribute / setAttribute.
  *
- * When creating a tenant always put these fields INSIDE the 'data' array:
+ * Custom attributes must be passed as TOP-LEVEL keys when creating a tenant:
  *
  *   Tenant::create([
- *       'id'   => 'acme',
- *       'data' => [
- *           'name'           => 'Acme Corp',
- *           'admin_name'     => 'John',
- *           'admin_email'    => 'john@acme.local',
- *           'admin_password' => '...',
- *       ],
+ *       'id'             => 'acme',
+ *       'name'           => 'Acme Corp',
+ *       'admin_name'     => 'John',
+ *       'admin_email'    => 'john@acme.local',
+ *       'admin_password' => '...',
  *   ]);
  *
- * Do NOT pass custom fields as top-level keys alongside 'data' – that causes
- * the JSON column to be overwritten and the value is silently lost.
+ * Do NOT wrap them in a nested 'data' array – stancl's BaseTenant will
+ * silently ignore the nested structure and the values will be lost.
  *
  * @property string      $id
  * @property string|null $name
