@@ -13,9 +13,11 @@ class UserController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $users = User::with(['tickets', 'reservations'])->get();
+        $perPage = $request->integer('per_page', 15);
+        $users = User::with(['tickets', 'reservations'])->paginate($perPage);
+
         return response()->json($users);
     }
 
@@ -28,15 +30,15 @@ class UserController extends Controller
             'name' => 'required|string|max:100',
             'email' => 'required|email|max:100|unique:users,email',
             'password' => 'required|string|min:6',
-            'role' => 'required|string|in:admin,user,manager',
+            'role' => 'required|string|in:admin,manager,user,technical',
             'phone' => 'nullable|string|max:20',
             'status' => 'nullable|string|in:active,inactive,suspended',
         ]);
 
         $validated['password'] = Hash::make($validated['password']);
-        
+
         $user = User::create($validated);
-        
+
         return response()->json($user, 201);
     }
 
@@ -46,6 +48,7 @@ class UserController extends Controller
     public function show(string $id)
     {
         $user = User::with(['tickets', 'reservations'])->findOrFail($id);
+
         return response()->json($user);
     }
 
@@ -55,12 +58,12 @@ class UserController extends Controller
     public function update(Request $request, string $id)
     {
         $user = User::findOrFail($id);
-        
+
         $validated = $request->validate([
             'name' => 'sometimes|string|max:100',
             'email' => ['sometimes', 'email', 'max:100', Rule::unique('users')->ignore($user->user_id, 'user_id')],
             'password' => 'sometimes|string|min:6',
-            'role' => 'sometimes|string|in:admin,user,manager',
+            'role' => 'sometimes|string|in:admin,manager,user,technical',
             'phone' => 'nullable|string|max:20',
             'status' => 'sometimes|string|in:active,inactive,suspended',
         ]);
@@ -70,7 +73,7 @@ class UserController extends Controller
         }
 
         $user->update($validated);
-        
+
         return response()->json($user);
     }
 
@@ -81,7 +84,7 @@ class UserController extends Controller
     {
         $user = User::findOrFail($id);
         $user->delete();
-        
-        return response()->json(['message' => 'Usuario eliminado correctamente'], 200);
+
+        return response()->json(['message' => 'User deleted successfully'], 200);
     }
 }

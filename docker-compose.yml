@@ -1,5 +1,4 @@
 services:
-  # PostgreSQL 15 con PostGIS
   postgres:
     image: postgis/postgis:15-3.3
     container_name: sims_postgres
@@ -32,11 +31,11 @@ services:
     networks:
       - sims_network
 
-  # Laravel API
   api:
     build:
       context: .
       dockerfile: Dockerfile
+    user: "${UID}:${GID}"
     container_name: sims_api
     environment:
       DB_CONNECTION: pgsql
@@ -45,7 +44,6 @@ services:
       DB_DATABASE: ${DB_DATABASE:-sims}
       DB_USERNAME: ${DB_USERNAME:-sims_user}
       DB_PASSWORD: ${DB_PASSWORD:-sims_password}
-
       APP_ENV: local
       APP_DEBUG: true
       APP_KEY: ${APP_KEY:-}
@@ -55,16 +53,14 @@ services:
     volumes:
       - .:/var/www/html
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     networks:
       - sims_network
-    working_dir: /var/www/html
-    command: php artisan serve --host=0.0.0.0 --port=8000
+
+volumes:
+  postgres_data:
 
 networks:
   sims_network:
     driver: bridge
-
-volumes:
-  postgres_data:
-    driver: local

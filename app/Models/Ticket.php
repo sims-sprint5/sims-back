@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Ticket extends Model
 {
+    use HasFactory;
+
     protected $primaryKey = 'ticket_id';
 
     protected $fillable = [
@@ -17,7 +20,7 @@ class Ticket extends Model
         'description',
         'priority',
         'status',
-        'assigned_to'
+        'assigned_to',
     ];
 
     // Relaciones
@@ -46,4 +49,3 @@ class Ticket extends Model
         return $this->hasMany(TicketMessage::class, 'ticket_id', 'ticket_id');
     }
 }
-
