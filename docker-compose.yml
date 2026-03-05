@@ -1,16 +1,4 @@
 services:
-  dnsmasq:
-    image: jpillora/dnsmasq
-    container_name: sims_dnsmasq
-    ports:
-      - "53:53/udp"
-    volumes:
-      - ./dnsmasq.conf:/etc/dnsmasq.conf:ro
-    networks:
-      - sims_network
-    cap_add:
-      - NET_ADMIN
-
   postgres:
     image: postgis/postgis:15-3.3
     container_name: sims_postgres

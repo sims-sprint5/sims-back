@@ -56,8 +56,8 @@ Cada tenant és **completament aïllat**: les seves dades mai es barregen amb le
 **Identificació de tenant**: per subdomini.
 
 ```
-http://empresa1.localhost:8000/api/v1/...  → tenant = empresa1
-http://empresa2.localhost:8000/api/v1/...  → tenant = empresa2
+http://empresa1.lvh.me:8000/api/v1/...    → tenant = empresa1
+http://empresa2.lvh.me:8000/api/v1/...    → tenant = empresa2
 http://localhost:8000/api/v1/superadmin/... → central (SuperAdmin)
 ```
 
@@ -149,7 +149,7 @@ TenantDeleted → DeleteDatabase → elimina el schema tenant_{id} sencer
 | Variable | Exemple local | Exemple producció | Descripció |
 |----------|--------------|-------------------|------------|
 | `APP_URL` | `http://localhost:8000` | `https://api.sims.com` | URL base de l'app central |
-| `TENANT_BASE_DOMAIN` | `localhost` | `sims.com` | Domini arrel dels subdominis de tenant |
+| `TENANT_BASE_DOMAIN` | `lvh.me` | `sims.com` | Domini arrel dels subdominis de tenant |
 | `APP_DOMAIN` | *(no cal en local)* | `api.sims.com` | Domini central (afegit a `central_domains`) |
 | `DB_CONNECTION` | `pgsql` | `pgsql` | Driver de BD |
 | `DB_HOST` | `sims_postgres` | `*` | Host PostgreSQL |
@@ -158,10 +158,10 @@ TenantDeleted → DeleteDatabase → elimina el schema tenant_{id} sencer
 
 ```
 APP_URL=http://localhost:8000
-TENANT_BASE_DOMAIN=localhost
+TENANT_BASE_DOMAIN=lvh.me
 
-→ URL tenant generat:  http://empresa1.localhost:8000
-→ Domini a la BD:       empresa1.localhost
+→ URL tenant generat:  http://empresa1.lvh.me:8000
+→ Domini a la BD:       empresa1
 ```
 
 ```
@@ -216,10 +216,10 @@ Si no s'especifiquen, es generen automàticament a partir de l'`id`.
     "tenant": {
         "id": "empresa1",
         "data": { "name": "Empresa Un, S.L.", "admin_email": "joan@empresa1.com" },
-        "domains": [{ "domain": "empresa1.localhost" }]
+        "domains": [{ "domain": "empresa1" }]
     },
     "access": {
-        "url": "http://empresa1.localhost:8000",
+        "url": "http://empresa1.lvh.me:8000",
         "admin_email": "joan@empresa1.com"
     }
 }
@@ -242,15 +242,15 @@ Creant tenant 'Empresa Un, S.L.' (empresa1)...
   ✅ Schema PostgreSQL: tenant_empresa1
   ✅ Migracions executades
   ✅ Dades seed creades
-  ✅ Domini: empresa1.localhost
+  ✅ Domini: empresa1
 
-+----------+--------------------------------+
-| Detall   | Valor                          |
-+----------+--------------------------------+
-| URL      | http://empresa1.localhost:8000 |
-| Admin    | joan@empresa1.com              |
-| Password | secretpassword                 |
-+----------+--------------------------------+
++----------+-------------------------------+
+| Detall   | Valor                         |
++----------+-------------------------------+
+| URL      | http://empresa1.lvh.me:8000   |
+| Admin    | joan@empresa1.com             |
+| Password | secretpassword                |
++----------+-------------------------------+
 ```
 
 ---
@@ -275,10 +275,10 @@ Els tokens es validen per dos middlewares apilats:
 
 | Endpoint | Mètode | Auth |
 |----------|--------|------|
-| `http://{id}.localhost:8000/api/auth/register` | POST | — |
-| `http://{id}.localhost:8000/api/auth/login` | POST | — |
-| `http://{id}.localhost:8000/api/auth/me` | GET | Bearer token |
-| `http://{id}.localhost:8000/api/auth/logout` | POST | Bearer token |
+| `http://{id}.lvh.me:8000/api/auth/register` | POST | — |
+| `http://{id}.lvh.me:8000/api/auth/login` | POST | — |
+| `http://{id}.lvh.me:8000/api/auth/me` | GET | Bearer token |
+| `http://{id}.lvh.me:8000/api/auth/logout` | POST | Bearer token |
 
 El tenant es detecta automàticament pel subdomini. Un cop inicialitzat el context del tenant, totes les operacions de BD es fan contra el schema `tenant_{id}`.
 
@@ -439,30 +439,37 @@ docker compose exec api php artisan tenants:migrate
 
 ## 11. Configuració local (DNS i ports)
 
-Per accedir als subdominis en local, el sistema operatiu ha de resoldre `*.localhost` a `127.0.0.1`.
+El projecte usa `lvh.me` com a domini base local. `lvh.me` és un domini públic gratuït el DNS del qual sempre resol qualsevol subdomini a `127.0.0.1`:
 
-### Opció A — `/etc/hosts` (manual, per a proves puntuals)
+```
+*.lvh.me  →  127.0.0.1  (via DNS públic, sense configurar res)
+```
+
+**No cal configurar cap fitxer de hosts ni cap servidor DNS.** Qualsevol màquina amb connexió a internet pot resoldre `empresa1.lvh.me` automàticament.
+
+### `.env` configurat per defecte
+
+```dotenv
+APP_URL=http://localhost:8000
+TENANT_BASE_DOMAIN=lvh.me
+```
+
+Les URLs dels tenants queden: `http://empresa1.lvh.me:8000/api/...`
+
+### Si no hi ha connexió a internet
+
+Com a alternativa, afegeix les entrades a mà a `/etc/hosts` (Linux/Mac) o `C:\Windows\System32\drivers\etc\hosts` (Windows):
 
 ```bash
-echo "127.0.0.1 empresa1.localhost" | sudo tee -a /etc/hosts
+echo "127.0.0.1 empresa1.lvh.me" | sudo tee -a /etc/hosts
 ```
 
-Cal repetir per a cada nou tenant. **No recomanat per a ús diari.**
-
-### Opció B — dnsmasq (wildcard, recomanat en local)
-
-El `docker-compose.yml` ja inclou un contenidor `sims_dnsmasq` configurat amb:
-
-```
-address=/.localhost/127.0.0.1
-```
-
-Només cal configurar el sistema operatiu per usar `127.0.0.1` com a servidor DNS (o usar el port del dnsmasq directament). Un cop fet, **tots els subdominis** `*.localhost` funcionen sense tocar `/etc/hosts`.
+Cal una línia per cada tenant. **No recomanat per a ús diari.**
 
 ### Port
 
 El servidor de l'API escolta al port **8000** en local (mapejat des del contenidor Docker).  
-L'URL d'un tenant en local té sempre la forma: `http://{id}.localhost:8000/api/...`
+L'URL d'un tenant en local té sempre la forma: `http://{id}.lvh.me:8000/api/...`
 
 ---
 
@@ -516,7 +523,7 @@ docker compose logs sims_postgres
 
 ### El subdomini no resol (ERR_NAME_NOT_RESOLVED)
 
-Afegeix el tenant a `/etc/hosts` o configura dnsmasq (veure §11).
+Comprova que tens connexió a internet (el DNS de `lvh.me` és extern). Si treballes offline, afegeix l'entrada a `/etc/hosts` (veure §11).
 
 ### `php artisan tinker` falla amb error de permisos (en Docker)
 

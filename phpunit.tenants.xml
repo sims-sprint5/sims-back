@@ -19,7 +19,7 @@
         <env name="APP_KEY" value="base64:0oErKnFKzAbeLxI4ZJlz/+SjtNUgaEo5OCJx251zLmk="/>
         <!-- Override superadmin credentials to test-specific values, regardless of .env -->
         <env name="APP_URL" value="http://localhost" force="true"/>
-        <env name="TENANT_BASE_DOMAIN" value="localhost" force="true"/>
+        <env name="TENANT_BASE_DOMAIN" value="lvh.me" force="true"/>
         <env name="SUPERADMIN_EMAIL" value="ci-admin@sims.test" force="true"/>
         <env name="SUPERADMIN_PASSWORD" value="ci-secret-123" force="true"/>
         <!-- PostgreSQL connection (falls back to .env if already set in the environment) -->
