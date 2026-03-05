@@ -20,6 +20,7 @@ Destinada a desenvolupadors nous i col·laboradors que hagin de treballar o ampl
 11. [Configuració local (DNS i ports)](#11-configuració-local-dns-i-ports)
 12. [Pas a producció](#12-pas-a-producció)
 13. [Troubleshooting](#13-troubleshooting)
+14. [Tests dels tenants](#14-tests-dels-tenants)
 
 ---
 
@@ -550,3 +551,31 @@ POST http://localhost:8000/api/v1/superadmin/tenants
 ```
 
 Eliminar el tenant **elimina el schema PostgreSQL sencer** i tots els seus recursos.
+---
+
+## 14. Tests dels tenants
+
+La suite de tests d'integració es troba a `tests/Tenant/` i cobreix el cicle de vida complet: login de SuperAdmin, creació i eliminació de tenants, login d'usuari admin, rebuig de tokens creuats i aïllament de dades entre tenants.
+
+### Executar els tests
+
+```bash
+docker exec sims_api ./vendor/bin/phpunit --configuration=phpunit.tenants.xml
+```
+
+Els tests s'han d'executar **dins del contenidor** perquè el PHP de l'host no té l'extensió `pdo_pgsql`. La configuració específica dels tests de tenant és a `phpunit.tenants.xml`.
+
+### Per a CI (GitHub Actions)
+
+El workflow `.github/workflows/tenant-tests.yml` aixeca un service container de PostgreSQL i instal·la PHP amb `pdo_pgsql` directament al runner, sense necessitat de Docker Compose.
+
+### Problemes de state leak en tests (ja corregits)
+
+Laravel reutilitza el mateix procés PHP per a totes les peticions HTTP simulades en una classe de tests. Això crea dos problemes que no existeixen en producció (on cada petició té el seu propi procés PHP-FPM):
+
+| Problema | Causa | Solució aplicada |
+|----------|-------|------------------|
+| Connexió de BD del tenant anterior no es revertia | `InitializeTenancyBySubdomain` mai crida `tenancy()->end()` en retornar la resposta | `call()` sobreescrit al `TestCase` crida `tenancy()->end()` després de cada petició |
+| Sanctum retornava sempre el mateix usuari cachesat | `AuthManager` cacheja el guard i l'usuari resolts entre peticions | `Auth::forgetGuards()` es crida després de cada petició per netejar la caché |
+
+Aquestes correccions es fan a `TenantLifecycleTest::call()` i **no afecten el comportament en producció**.
