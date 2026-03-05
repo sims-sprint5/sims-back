@@ -42,7 +42,7 @@ return [
         ],
 
         'superadmin' => [
-            'driver'   => 'session',
+            'driver' => 'session',
             'provider' => 'superadmins',
         ],
     ],

@@ -23,8 +23,11 @@ class TenantLifecycleTest extends TestCase
     use WithFaker;
 
     private string $tenantId;
+
     private string $adminEmail;
+
     private string $adminPassword = 'Test1234!';
+
     private string $superadminToken;
 
     /** Run central migrations once per test class, not before every test. */
@@ -69,7 +72,7 @@ class TenantLifecycleTest extends TestCase
         }
 
         // Use a unique tenant ID per test run to avoid collisions.
-        $this->tenantId   = 'ci-' . substr(md5(microtime()), 0, 8);
+        $this->tenantId = 'ci-'.substr(md5(microtime()), 0, 8);
         $this->adminEmail = "admin@{$this->tenantId}.lvh.me";
 
         // Always upsert the test SuperAdmin so the password matches what we
@@ -78,14 +81,14 @@ class TenantLifecycleTest extends TestCase
         $superadmin = SuperAdmin::updateOrCreate(
             ['email' => env('SUPERADMIN_EMAIL', 'ci-admin@sims.test')],
             [
-                'name'     => 'CI Admin',
+                'name' => 'CI Admin',
                 'password' => Hash::make(env('SUPERADMIN_PASSWORD', 'ci-secret-123')),
             ]
         );
 
         // Obtain a SuperAdmin token for the protected endpoints.
         $response = $this->postJson('/api/v1/superadmin/auth/login', [
-            'email'    => $superadmin->email,
+            'email' => $superadmin->email,
             'password' => env('SUPERADMIN_PASSWORD', 'ci-secret-123'),
         ]);
 
@@ -113,9 +116,9 @@ class TenantLifecycleTest extends TestCase
     {
         $response = $this->withToken($this->superadminToken)
             ->postJson('/api/v1/superadmin/tenants', [
-                'id'             => $this->tenantId,
-                'name'           => 'CI Test Company',
-                'admin_email'    => $this->adminEmail,
+                'id' => $this->tenantId,
+                'name' => 'CI Test Company',
+                'admin_email' => $this->adminEmail,
                 'admin_password' => $this->adminPassword,
             ]);
 
@@ -130,18 +133,18 @@ class TenantLifecycleTest extends TestCase
         // First create the tenant.
         $this->withToken($this->superadminToken)
             ->postJson('/api/v1/superadmin/tenants', [
-                'id'             => $this->tenantId,
-                'name'           => 'CI Test Company',
-                'admin_email'    => $this->adminEmail,
+                'id' => $this->tenantId,
+                'name' => 'CI Test Company',
+                'admin_email' => $this->adminEmail,
                 'admin_password' => $this->adminPassword,
             ])
             ->assertStatus(201);
 
         // Then log in as the tenant admin via the tenant subdomain.
         $response = $this->postJson("http://{$this->tenantId}.lvh.me/api/v1/auth/login", [
-                'email'    => $this->adminEmail,
-                'password' => $this->adminPassword,
-            ]);
+            'email' => $this->adminEmail,
+            'password' => $this->adminPassword,
+        ]);
 
         $response->assertStatus(200)
             ->assertJsonStructure(['data' => ['access_token', 'user']]);
@@ -152,9 +155,9 @@ class TenantLifecycleTest extends TestCase
     {
         $this->withToken($this->superadminToken)
             ->postJson('/api/v1/superadmin/tenants', [
-                'id'             => $this->tenantId,
-                'name'           => 'CI Test Company',
-                'admin_email'    => $this->adminEmail,
+                'id' => $this->tenantId,
+                'name' => 'CI Test Company',
+                'admin_email' => $this->adminEmail,
                 'admin_password' => $this->adminPassword,
             ])
             ->assertStatus(201);
@@ -171,9 +174,9 @@ class TenantLifecycleTest extends TestCase
     {
         $this->withToken($this->superadminToken)
             ->postJson('/api/v1/superadmin/tenants', [
-                'id'             => $this->tenantId,
-                'name'           => 'CI Test Company',
-                'admin_email'    => $this->adminEmail,
+                'id' => $this->tenantId,
+                'name' => 'CI Test Company',
+                'admin_email' => $this->adminEmail,
                 'admin_password' => $this->adminPassword,
             ])
             ->assertStatus(201);
@@ -185,21 +188,21 @@ class TenantLifecycleTest extends TestCase
         $this->assertNull(Tenant::find($this->tenantId));
 
         // Prevent tearDown from trying to delete it again.
-        $this->tenantId = 'already-deleted-' . $this->tenantId;
+        $this->tenantId = 'already-deleted-'.$this->tenantId;
     }
 
     /** Data created in one tenant must not be visible in another. */
     public function test_tenant_data_is_isolated(): void
     {
-        $tenantIdB     = $this->tenantId . 'b';
-        $adminEmailB   = "admin@{$tenantIdB}.lvh.me";
+        $tenantIdB = $this->tenantId.'b';
+        $adminEmailB = "admin@{$tenantIdB}.lvh.me";
 
         // Create tenant A.
         $this->withToken($this->superadminToken)
             ->postJson('/api/v1/superadmin/tenants', [
-                'id'             => $this->tenantId,
-                'name'           => 'CI Tenant A',
-                'admin_email'    => $this->adminEmail,
+                'id' => $this->tenantId,
+                'name' => 'CI Tenant A',
+                'admin_email' => $this->adminEmail,
                 'admin_password' => $this->adminPassword,
             ])
             ->assertStatus(201);
@@ -207,18 +210,18 @@ class TenantLifecycleTest extends TestCase
         // Create tenant B.
         $this->withToken($this->superadminToken)
             ->postJson('/api/v1/superadmin/tenants', [
-                'id'             => $tenantIdB,
-                'name'           => 'CI Tenant B',
-                'admin_email'    => $adminEmailB,
+                'id' => $tenantIdB,
+                'name' => 'CI Tenant B',
+                'admin_email' => $adminEmailB,
                 'admin_password' => $this->adminPassword,
             ])
             ->assertStatus(201);
 
         // Log in as admin of tenant A and fetch its user list.
         $tokenA = $this->postJson("http://{$this->tenantId}.lvh.me/api/v1/auth/login", [
-                'email'    => $this->adminEmail,
-                'password' => $this->adminPassword,
-            ])
+            'email' => $this->adminEmail,
+            'password' => $this->adminPassword,
+        ])
             ->assertStatus(200)
             ->json('data.access_token');
 
@@ -229,9 +232,9 @@ class TenantLifecycleTest extends TestCase
 
         // Log in as admin of tenant B and fetch its user list.
         $tokenB = $this->postJson("http://{$tenantIdB}.lvh.me/api/v1/auth/login", [
-                'email'    => $adminEmailB,
-                'password' => $this->adminPassword,
-            ])
+            'email' => $adminEmailB,
+            'password' => $this->adminPassword,
+        ])
             ->assertStatus(200)
             ->json('data.access_token');
 

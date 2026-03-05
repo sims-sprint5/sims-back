@@ -14,7 +14,7 @@ class VehicleGeofenceLog extends Model
         'event_type',
         'event_timestamp',
         'latitude',
-        'longitude'
+        'longitude',
     ];
 
     protected $casts = [

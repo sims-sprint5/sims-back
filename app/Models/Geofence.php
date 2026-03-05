@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 class Geofence extends Model
 {
     use HasFactory;
+
     protected $primaryKey = 'geofence_id';
 
     protected $fillable = [
@@ -18,7 +19,7 @@ class Geofence extends Model
         'center_longitude',
         'radius',
         'polygon_coordinates',
-        'status'
+        'status',
     ];
 
     protected $casts = [

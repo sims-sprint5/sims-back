@@ -20,7 +20,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'ensure.superadmin' => \App\Http\Middleware\EnsureSuperAdmin::class,
-            'ensure.tenant'     => \App\Http\Middleware\EnsureTenantUser::class,
+            'ensure.tenant' => \App\Http\Middleware\EnsureTenantUser::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

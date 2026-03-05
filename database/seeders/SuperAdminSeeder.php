@@ -13,7 +13,7 @@ class SuperAdminSeeder extends Seeder
         SuperAdmin::firstOrCreate(
             ['email' => env('SUPERADMIN_EMAIL')],
             [
-                'name'     => env('SUPERADMIN_NAME'),
+                'name' => env('SUPERADMIN_NAME'),
                 'password' => Hash::make(env('SUPERADMIN_PASSWORD', 'changeme')),
             ]
         );

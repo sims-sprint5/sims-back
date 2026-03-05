@@ -15,6 +15,7 @@ class ReservationController extends Controller
     {
         $perPage = $request->integer('per_page', 15);
         $reservations = Reservation::with(['user', 'vehicle'])->paginate($perPage);
+
         return response()->json($reservations);
     }
 
@@ -45,6 +46,7 @@ class ReservationController extends Controller
     public function show(string $id)
     {
         $reservation = Reservation::with(['user', 'vehicle', 'tickets'])->findOrFail($id);
+
         return response()->json($reservation);
     }
 

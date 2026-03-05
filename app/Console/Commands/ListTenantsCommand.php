@@ -8,6 +8,7 @@ use Illuminate\Console\Command;
 class ListTenantsCommand extends Command
 {
     protected $signature = 'tenant:list';
+
     protected $description = 'List all tenants with their assigned domains';
 
     public function handle(): int
@@ -16,6 +17,7 @@ class ListTenantsCommand extends Command
 
         if ($tenants->isEmpty()) {
             $this->warn('No tenants found.');
+
             return Command::SUCCESS;
         }
 

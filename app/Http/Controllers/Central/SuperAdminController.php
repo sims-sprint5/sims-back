@@ -19,20 +19,20 @@ class SuperAdminController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'name'     => 'required|string|max:255',
-            'email'    => 'required|email|unique:superadmins,email',
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|unique:superadmins,email',
             'password' => 'required|string|min:8',
         ]);
 
         $admin = SuperAdmin::create([
-            'name'     => $request->name,
-            'email'    => $request->email,
+            'name' => $request->name,
+            'email' => $request->email,
             'password' => Hash::make($request->password),
         ]);
 
         return response()->json([
             'message' => 'SuperAdmin created',
-            'admin'   => $admin->only('id', 'name', 'email', 'created_at'),
+            'admin' => $admin->only('id', 'name', 'email', 'created_at'),
         ], 201);
     }
 
@@ -47,6 +47,7 @@ class SuperAdminController extends Controller
         }
 
         $admin->delete();
+
         return response()->json(['message' => 'SuperAdmin deleted successfully.']);
     }
 }

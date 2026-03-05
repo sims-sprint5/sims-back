@@ -17,6 +17,7 @@ class UserController extends Controller
     {
         $perPage = $request->integer('per_page', 15);
         $users = User::with(['tickets', 'reservations'])->paginate($perPage);
+
         return response()->json($users);
     }
 
@@ -47,6 +48,7 @@ class UserController extends Controller
     public function show(string $id)
     {
         $user = User::with(['tickets', 'reservations'])->findOrFail($id);
+
         return response()->json($user);
     }
 

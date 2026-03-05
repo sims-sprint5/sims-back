@@ -2,10 +2,10 @@
 
 namespace App\Models;
 
-use Stancl\Tenancy\Database\Models\Tenant as BaseTenant;
 use Stancl\Tenancy\Contracts\TenantWithDatabase;
 use Stancl\Tenancy\Database\Concerns\HasDatabase;
 use Stancl\Tenancy\Database\Concerns\HasDomains;
+use Stancl\Tenancy\Database\Models\Tenant as BaseTenant;
 
 /**
  * All custom fields (name, admin_name, admin_email …) are stored inside the
@@ -24,11 +24,11 @@ use Stancl\Tenancy\Database\Concerns\HasDomains;
  * Do NOT wrap them in a nested 'data' array – stancl's BaseTenant will
  * silently ignore the nested structure and the values will be lost.
  *
- * @property string      $id
+ * @property string $id
  * @property string|null $name
  * @property string|null $admin_name
  * @property string|null $admin_email
- * @property array|null  $data
+ * @property array|null $data
  */
 class Tenant extends BaseTenant implements TenantWithDatabase
 {

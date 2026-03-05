@@ -18,27 +18,27 @@ class TenantController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'id'             => 'required|string|alpha_dash|unique:tenants,id|max:50',
-            'name'           => 'required|string|max:255',
-            'admin_name'     => 'nullable|string|max:255',
-            'admin_email'    => 'nullable|email|max:255',
+            'id' => 'required|string|alpha_dash|unique:tenants,id|max:50',
+            'name' => 'required|string|max:255',
+            'admin_name' => 'nullable|string|max:255',
+            'admin_email' => 'nullable|email|max:255',
             'admin_password' => 'nullable|string|min:8',
         ]);
 
-        $tenantId   = $request->id;
+        $tenantId = $request->id;
         $baseDomain = env('TENANT_BASE_DOMAIN', 'localhost');
 
-        $parsed     = parse_url(config('app.url'));
-        $scheme     = $parsed['scheme'] ?? 'http';
-        $port       = isset($parsed['port']) ? ':' . $parsed['port'] : '';
+        $parsed = parse_url(config('app.url'));
+        $scheme = $parsed['scheme'] ?? 'http';
+        $port = isset($parsed['port']) ? ':'.$parsed['port'] : '';
 
         $adminEmail = $request->admin_email ?? "admin@{$tenantId}.{$baseDomain}";
 
         $tenant = Tenant::create([
-            'id'             => $tenantId,
-            'name'           => $request->name,
-            'admin_name'     => $request->admin_name ?? 'Admin ' . ucfirst($tenantId),
-            'admin_email'    => $adminEmail,
+            'id' => $tenantId,
+            'name' => $request->name,
+            'admin_name' => $request->admin_name ?? 'Admin '.ucfirst($tenantId),
+            'admin_email' => $adminEmail,
             'admin_password' => $request->admin_password ?? '',
         ]);
 
@@ -51,19 +51,20 @@ class TenantController extends Controller
         try {
             SeedDatabase::dispatchSync($tenant);
         } catch (\Throwable $e) {
-            Log::error("Tenant seed failed for '{$tenantId}': " . $e->getMessage());
+            Log::error("Tenant seed failed for '{$tenantId}': ".$e->getMessage());
             $tenant->delete();
+
             return response()->json([
                 'message' => 'Tenant creation failed during database seeding.',
-                'error'   => $e->getMessage(),
+                'error' => $e->getMessage(),
             ], 500);
         }
 
         return response()->json([
             'message' => 'Tenant created successfully',
-            'tenant'  => $tenant->load('domains'),
-            'access'  => [
-                'url'         => "{$scheme}://{$tenantId}.{$baseDomain}{$port}",
+            'tenant' => $tenant->load('domains'),
+            'access' => [
+                'url' => "{$scheme}://{$tenantId}.{$baseDomain}{$port}",
                 'admin_email' => $adminEmail,
             ],
         ], 201);
@@ -72,6 +73,7 @@ class TenantController extends Controller
     public function show(string $id)
     {
         $tenant = Tenant::with('domains')->findOrFail($id);
+
         return response()->json($tenant);
     }
 
@@ -79,6 +81,7 @@ class TenantController extends Controller
     {
         $tenant = Tenant::findOrFail($id);
         $tenant->delete();
+
         return response()->json(['message' => "Tenant '{$id}' deleted successfully."]);
     }
 }

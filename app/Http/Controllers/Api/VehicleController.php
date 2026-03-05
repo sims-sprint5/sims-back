@@ -15,6 +15,7 @@ class VehicleController extends Controller
     {
         $perPage = $request->integer('per_page', 15);
         $vehicles = Vehicle::with(['reservations'])->paginate($perPage);
+
         return response()->json($vehicles);
     }
 
@@ -45,6 +46,7 @@ class VehicleController extends Controller
     public function show(string $id)
     {
         $vehicle = Vehicle::with(['reservations', 'tickets'])->findOrFail($id);
+
         return response()->json($vehicle);
     }
 
@@ -56,7 +58,7 @@ class VehicleController extends Controller
         $vehicle = Vehicle::findOrFail($id);
 
         $validated = $request->validate([
-            'license_plate' => 'sometimes|string|max:20|unique:vehicles,license_plate,' . $id . ',vehicle_id',
+            'license_plate' => 'sometimes|string|max:20|unique:vehicles,license_plate,'.$id.',vehicle_id',
             'brand' => 'sometimes|string|max:100',
             'model' => 'sometimes|string|max:100',
             'year' => 'nullable|integer|min:1900|max:2100',

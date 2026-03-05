@@ -15,6 +15,7 @@ class TicketController extends Controller
     {
         $perPage = $request->integer('per_page', 15);
         $tickets = Ticket::with(['user', 'vehicle', 'reservation', 'assignedUser'])->paginate($perPage);
+
         return response()->json($tickets);
     }
 
@@ -46,6 +47,7 @@ class TicketController extends Controller
     public function show(string $id)
     {
         $ticket = Ticket::with(['user', 'vehicle', 'reservation', 'assignedUser'])->findOrFail($id);
+
         return response()->json($ticket);
     }
 

@@ -9,7 +9,8 @@ use Illuminate\Support\Facades\Schema;
  * remember_token, both expected by Illuminate\Foundation\Auth\User
  * (Authenticatable). This migration adds them safely.
  */
-return new class extends Migration {
+return new class extends Migration
+{
     public function up(): void
     {
         Schema::table('users', function (Blueprint $table) {

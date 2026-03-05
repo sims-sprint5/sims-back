@@ -2,15 +2,15 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\GeofenceController;
+use App\Http\Controllers\Api\ReservationController;
+use App\Http\Controllers\Api\TicketController;
+use App\Http\Controllers\Api\UserController;
+use App\Http\Controllers\Api\VehicleController;
 use Illuminate\Support\Facades\Route;
 use Stancl\Tenancy\Middleware\InitializeTenancyBySubdomain;
 use Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains;
-use App\Http\Controllers\Api\AuthController;
-use App\Http\Controllers\Api\UserController;
-use App\Http\Controllers\Api\VehicleController;
-use App\Http\Controllers\Api\ReservationController;
-use App\Http\Controllers\Api\TicketController;
-use App\Http\Controllers\Api\GeofenceController;
 
 /*
 |--------------------------------------------------------------------------

@@ -2,9 +2,9 @@
 
 namespace Database\Factories;
 
-use Illuminate\Database\Eloquent\Factories\Factory;
 use App\Models\User;
 use App\Models\Vehicle;
+use Illuminate\Database\Eloquent\Factories\Factory;
 
 class ReservationFactory extends Factory
 {
