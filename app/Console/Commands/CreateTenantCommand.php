@@ -51,7 +51,7 @@ class CreateTenantCommand extends Command
             ],
         ]);
 
-        $tenant->domains()->create(['domain' => "{$id}.{$baseDomain}"]);
+        $tenant->domains()->create(['domain' => $id]);
 
         try {
             SeedDatabase::dispatchSync($tenant);
