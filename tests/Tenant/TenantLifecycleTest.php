@@ -8,16 +8,7 @@ use Illuminate\Foundation\Testing\WithFaker;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
-/**
- * End-to-end tenant lifecycle tests.
- *
- * These tests require a real PostgreSQL connection and run against the
- * phpunit.tenants.xml configuration. They are intentionally excluded from
- * the standard SQLite suite.
- *
- * Each test class creates its own isolated tenant and deletes it in tearDown
- * so that test runs never pollute each other.
- */
+
 class TenantLifecycleTest extends TestCase
 {
     use WithFaker;
@@ -33,21 +24,7 @@ class TenantLifecycleTest extends TestCase
     /** Run central migrations once per test class, not before every test. */
     private static bool $migrated = false;
 
-    /**
-     * End tenancy and clear Sanctum's cached auth user after every HTTP call.
-     *
-     * Two problems arise when the same PHP process handles multiple test requests:
-     *
-     * 1. InitializeTenancyBySubdomain never calls tenancy()->end() after the
-     *    response — the DB connection, storage_path, etc. leak into the next
-     *    request. Calling tenancy()->end() here reverts all bootstrappers.
-     *
-     * 2. Laravel's AuthManager caches the resolved guard (and its user) across
-     *    calls. If a previous request authenticated a SuperAdmin, the
-     *    'sanctum' guard's $this->user is still set to that SuperAdmin for the
-     *    next request, so Sanctum skips re-resolving the token entirely.
-     *    Auth::forgetGuards() (= AuthManager::forgetGuards()) clears that cache.
-     */
+
     public function call($method, $uri, $parameters = [], $cookies = [], $files = [], $server = [], $content = null)
     {
         $response = parent::call($method, $uri, $parameters, $cookies, $files, $server, $content);

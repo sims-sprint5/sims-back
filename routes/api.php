@@ -13,8 +13,7 @@ Route::prefix('v1/superadmin/auth')->group(function () {
     Route::post('login', [SuperAdminAuthController::class, 'login']);
 });
 
-// SuperAdmin protected routes – auth:sanctum resolves the token, ensure.superadmin
-// guards that the tokenable model is actually a SuperAdmin (not a tenant User).
+// SuperAdmin protected routes
 Route::middleware(['auth:sanctum', 'ensure.superadmin'])->prefix('v1/superadmin')->group(function () {
     // Auth
     Route::get('auth/me', [SuperAdminAuthController::class, 'me']);

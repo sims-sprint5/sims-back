@@ -12,17 +12,6 @@ use Illuminate\Support\Facades\Route;
 use Stancl\Tenancy\Middleware\InitializeTenancyBySubdomain;
 use Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains;
 
-/*
-|--------------------------------------------------------------------------
-| Tenant Routes
-|--------------------------------------------------------------------------
-|
-| All routes here are tenant-aware. They are initialized with the tenant
-| determined by the subdomain. For example:
-|   empresa1.localhost/api/v1/users → Tenant: empresa1
-|   empresa2.localhost/api/v1/users → Tenant: empresa2
-|
-*/
 
 Route::prefix('api')->middleware([
     'api',

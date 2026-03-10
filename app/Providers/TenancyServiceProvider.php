@@ -26,9 +26,7 @@ class TenancyServiceProvider extends ServiceProvider
                 JobPipeline::make([
                     Jobs\CreateDatabase::class,
                     Jobs\MigrateDatabase::class,
-                    // SeedDatabase is intentionally excluded here.
-                    // It runs explicitly in TenantController after the domain
-                    // is created, so a seed failure never blocks domain creation.
+
                 ])->send(function (Events\TenantCreated $event) {
                     return $event->tenant;
                 })->shouldBeQueued(false),
