@@ -16,6 +16,9 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Global CORS – must run before everything else
+        $middleware->prepend(\App\Http\Middleware\CorsMiddleware::class);
+
         // Tenancy must initialize before access-prevention check
         $middleware->priority([
             \Stancl\Tenancy\Middleware\InitializeTenancyBySubdomain::class,
