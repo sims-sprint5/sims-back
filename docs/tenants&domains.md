@@ -69,51 +69,41 @@ http://localhost:8000/api/v1/superadmin/... → central (SuperAdmin)
 
 | Taula | Contingut |
 |-------|-----------|
-| `tenants` | Llista de tenants. `data` és un JSON amb `name`, `admin_email`, etc. |
-| `domains` | Un registre per tenant: `empresa1.localhost` o `empresa1.sims.com` |
-| `superadmins` | Usuaris globals (no pertanyen a cap tenant) |
-| `personal_access_tokens` | Tokens Sanctum dels SuperAdmins |
+| `tenants` | Llista de tenants |
+| `domains` | Dominis de cada tenant |
+| `superadmins` | Usuaris globals |
+| `personal_access_tokens` | Tokens Sanctum (SuperAdmins) |
 
 ### Schema `tenant_{id}` (per tenant)
 
 | Taula | Contingut |
 |-------|-----------|
-| `users` | Usuaris del tenant (rol: `admin`, `manager`, `user`, `technical`) |
-| `vehicles` | Vehicles gestionats pel tenant |
-| `reservations` | Reserves de vehicles |
-| `tickets` | Incidències i suport |
+| `users` | Usuaris del tenant |
+| `vehicles` | Vehicles gestionats |
+| `reservations` | Reserves |
+| `tickets` | Incidències |
 | `geofences` | Zones geogràfiques |
-| `vehicle_geofence_logs` | Historial d'entrades/sortides de geofences |
-| `personal_access_tokens` | Tokens Sanctum dels usuaris del tenant |
-| `sessions` | Sessions web del tenant |
+| `vehicle_geofence_logs` | Historial de geofences |
+| `personal_access_tokens` | Tokens Sanctum (usuaris) |
+| `sessions` | Sessions web |
 
 ### Model `Tenant`
 
-El camp `data` és un JSON que emmagatzema metadades:
+Els camps es guarden com a **atributs directes**:
 
 ```php
-// ✅ Correcte: 'name' dins de 'data'
 Tenant::create([
-    'id'   => 'empresa1',
-    'data' => [
-        'name'        => 'Empresa Un',
-        'admin_email' => 'admin@empresa1.localhost',
-    ],
+    'id' => 'empresa1',
+    'name' => 'Empresa Un',
+    'admin_name' => 'Joan Garcia',
+    'admin_email' => 'joan@empresa1.com',
+    'admin_password' => 'secretpassword',
 ]);
 
-// ❌ Mai fer-ho així: 'name' es perd silenciosament
-Tenant::create([
-    'id'   => 'empresa1',
-    'name' => 'Empresa Un',   // ← es sobreescriu per 'data', es perd
-    'data' => [...],
-]);
-```
-
-Accessors disponibles al model `Tenant`:
-
-```php
-$tenant->getName();       // string|null  — el nom de l'empresa
-$tenant->getAdminEmail(); // string|null  — l'email de l'admin
+// Accés
+$tenant->name;
+$tenant->admin_email;
+$tenant->admin_password; // null després de seed
 ```
 
 ---
@@ -154,49 +144,31 @@ TenantDeleted → DeleteDatabase → elimina el schema tenant_{id} sencer
 | `DB_CONNECTION` | `pgsql` | `pgsql` | Driver de BD |
 | `DB_HOST` | `sims_postgres` | `*` | Host PostgreSQL |
 
-### Com s'usen `APP_URL` i `TENANT_BASE_DOMAIN`
+### Com es generen les URLs
 
+**Local:**
 ```
 APP_URL=http://localhost:8000
 TENANT_BASE_DOMAIN=lvh.me
-
-→ URL tenant generat:  http://empresa1.lvh.me:8000
-→ Domini a la BD:       empresa1
+→ URL tenant: http://empresa1.lvh.me:8000
 ```
 
+**Producció:**
 ```
 APP_URL=https://api.sims.com
 TENANT_BASE_DOMAIN=sims.com
-
-→ URL tenant generat:  https://empresa1.sims.com
-→ Domini a la BD:       empresa1.sims.com
-```
-
-### `central_domains` (config/tenancy.php)
-
-Aquesta llista defineix quins dominis pertanyen a la part **central** (no tenant).  
-Es construeix automàticament a partir de les variables d'entorn:
-
-```php
-'central_domains' => array_filter([
-    '127.0.0.1',
-    'localhost',
-    env('TENANT_BASE_DOMAIN'),  // evita redirecció infinita si coincideix amb el base
-    env('APP_DOMAIN'),           // domini de l'API central en producció
-]),
+APP_DOMAIN=api.sims.com
+→ URL tenant: https://empresa1.sims.com
 ```
 
 ---
 
 ## 5. Crear un tenant
 
-### Via API (Postman / frontend)
+**Endpoint:** `POST /api/v1/superadmin/tenants`  
+**Auth:** Bearer token (SuperAdmin)
 
-```
-POST http://localhost:8000/api/v1/superadmin/tenants
-Authorization: Bearer {token_superadmin}
-Content-Type: application/json
-
+```json
 {
     "id":             "empresa1",
     "name":           "Empresa Un, S.L.",
@@ -206,16 +178,17 @@ Content-Type: application/json
 }
 ```
 
-`admin_name`, `admin_email` i `admin_password` són opcionals.  
-Si no s'especifiquen, es generen automàticament a partir de l'`id`.
+**Camps opcionals:** `admin_name`, `admin_email`, `admin_password` es generen automàticament si falten.
 
 **Resposta 201:**
 ```json
 {
-    "message": "Tenant creat correctament",
+    "message": "Tenant created successfully",
     "tenant": {
         "id": "empresa1",
-        "data": { "name": "Empresa Un, S.L.", "admin_email": "joan@empresa1.com" },
+        "name": "Empresa Un, S.L.",
+        "admin_name": "Joan Garcia",
+        "admin_email": "joan@empresa1.com",
         "domains": [{ "domain": "empresa1" }]
     },
     "access": {
@@ -225,112 +198,57 @@ Si no s'especifiquen, es generen automàticament a partir de l'`id`.
 }
 ```
 
-### Via Artisan (terminal / scripts de deploy)
-
-```bash
-# Dins del contenidor Docker
-docker compose exec api php artisan tenant:create empresa1 "Empresa Un, S.L." \
-    --admin-email=joan@empresa1.com \
-    --admin-password=secretpassword \
-    --admin-name="Joan Garcia"
-```
-
-Output esperat:
-```
-Creant tenant 'Empresa Un, S.L.' (empresa1)...
-
-  ✅ Schema PostgreSQL: tenant_empresa1
-  ✅ Migracions executades
-  ✅ Dades seed creades
-  ✅ Domini: empresa1
-
-+----------+-------------------------------+
-| Detall   | Valor                         |
-+----------+-------------------------------+
-| URL      | http://empresa1.lvh.me:8000   |
-| Admin    | joan@empresa1.com             |
-| Password | secretpassword                |
-+----------+-------------------------------+
-```
-
 ---
 
 ## 6. Autenticació
 
-Hi ha **dos sistemes d'autenticació independents**:
+### SuperAdmin (central)
 
-### 6.1 SuperAdmin (central)
+| Endpoint | Mètode |
+|----------|--------|
+| `/api/v1/superadmin/auth/login` | POST |
+| `/api/v1/superadmin/auth/me` | GET |
+| `/api/v1/superadmin/auth/logout` | POST |
 
-| Endpoint | Mètode | Auth |
-|----------|--------|------|
-| `/api/v1/superadmin/auth/login` | POST | — |
-| `/api/v1/superadmin/auth/me` | GET | Bearer token |
-| `/api/v1/superadmin/auth/logout` | POST | Bearer token |
+Middlewares: `auth:sanctum`, `ensure.superadmin`
 
-Els tokens es validen per dos middlewares apilats:
-- `auth:sanctum` → verifica que el token sigui vàlid
-- `ensure.superadmin` → verifica que el model tokenable sigui un `SuperAdmin` (no un `User` de tenant)
+### Usuari de tenant
 
-### 6.2 Usuari de tenant
+| Endpoint | Mètode |
+|----------|--------|
+| `http://{id}.lvh.me:8000/api/v1/auth/register` | POST |
+| `http://{id}.lvh.me:8000/api/v1/auth/login` | POST |
+| `http://{id}.lvh.me:8000/api/v1/auth/me` | GET |
+| `http://{id}.lvh.me:8000/api/v1/auth/logout` | POST |
 
-| Endpoint | Mètode | Auth |
-|----------|--------|------|
-| `http://{id}.lvh.me:8000/api/auth/register` | POST | — |
-| `http://{id}.lvh.me:8000/api/auth/login` | POST | — |
-| `http://{id}.lvh.me:8000/api/auth/me` | GET | Bearer token |
-| `http://{id}.lvh.me:8000/api/auth/logout` | POST | Bearer token |
-
-El tenant es detecta automàticament pel subdomini. Un cop inicialitzat el context del tenant, totes les operacions de BD es fan contra el schema `tenant_{id}`.
+El tenant es detecta pel subdomini. Les operacions de BD van automàticament al schema `tenant_{id}`.
 
 ---
 
 ## 7. Rutes: central vs. tenant
 
-| Fitxer | Àmbit | Middleware clau |
-|--------|-------|-----------------|
-| `routes/api.php` | Central (SuperAdmin) | `auth:sanctum` + `ensure.superadmin` |
-| `routes/tenant.php` | Tenant (per subdomini) | `InitializeTenancyBySubdomain` + `PreventAccessFromCentralDomains` |
-| `routes/web.php` | Públic central | cap |
+| Fitxer | Àmbit | Middlewares |
+|--------|-------|------------|
+| `routes/api.php` | SuperAdmin central | `auth:sanctum`, `ensure.superadmin` |
+| `routes/tenant.php` | Tenant per subdomini | `InitializeTenancyBySubdomain`, `PreventAccessFromCentralDomains` |
+| `routes/web.php` | Públic | cap |
 
-**Ordre dels middlewares a `routes/tenant.php`** (important no canviar):
-
-```php
-Route::middleware([
-    'api',
-    InitializeTenancyBySubdomain::class,  // primer: detecta i inicialitza el tenant
-    PreventAccessFromCentralDomains::class, // segon: bloqueja dominis centrals
-])->...
-```
+> **Ordre important a `routes/tenant.php`:** `InitializeTenancyBySubdomain` primer, després `PreventAccessFromCentralDomains`.
 
 ---
 
 ## 8. Migrations de tenant
 
-Totes les migrations que han de córrer **dins de cada tenant** van a:
+Totes les migrations de tenant es guarden a `database/migrations/tenant/`  
+Les migrations de `database/migrations/` afecten només al schema central `public`.
 
-```
-database/migrations/tenant/
-```
-
-Les migrations de la carpeta arrel (`database/migrations/`) NOMÉS afecten la BD central (`public` schema).
-
-### Crear una nova migració de tenant
-
-```bash
-# Crea la migració manualment a la carpeta tenant/
-php artisan make:migration create_xxxx_table
-# Mou el fitxer generat a database/migrations/tenant/
-mv database/migrations/YYYY_..._create_xxxx_table.php database/migrations/tenant/
-```
-
-O directament:
+### Crear una migració
 
 ```bash
 php artisan make:migration create_xxxx_table --path=database/migrations/tenant
 ```
 
-> La migració s'executarà automàticament per a cada tenant nou que es creï.  
-> Per aplicar-la a tenants **ja existents**, cal executar:
+S'executarà automàticament en cada tenant nou. Per aplicar-la a tenants existents:
 
 ```bash
 docker compose exec api php artisan tenants:migrate
@@ -342,94 +260,59 @@ docker compose exec api php artisan tenants:migrate --tenants=empresa1
 
 ## 9. Seeders de tenant
 
-El seeder de tenant és `database/seeders/TenantDatabaseSeeder.php`.  
-S'executa automàticament quan es crea un tenant nou (via API o Artisan).
+El seeder `database/seeders/TenantDatabaseSeeder.php` s'executa automàticament quan es crea un tenant (via API).
 
-Crea per defecte:
-- 1 usuari **admin** (amb les credencials indicades en la creació)
-- 5 usuaris amb rol `user` (factories)
+Crea:
+- 1 usuari admin (credencials indicades en la creació)
+- 5 usuaris rol `user`
 - 8 vehicles
 - 6 reserves
 - 10 tickets
 - 5 geofences
 
-Un cop el seed acaba, **elimina la contrasenya del camp `data`** del tenant per seguretat.
+Després del seed, `admin_password` es descarta per seguretat.
 
-### Re-executar el seed d'un tenant existent
+### Re-executar el seed
 
 ```bash
 docker compose exec api php artisan tenants:seed --tenants=empresa1
 ```
 
-> ⚠️ Això crea dades addicionals, **no esborra les existents**. Fes-ho només en entorns de desenvolupament.
+> ⚠️ Crea dades addicionals (no les esborra). Només en desarrollo.
 
 ---
 
 ## 10. Afegir un nou mòdul (model + migració + ruta)
 
-Exemple: afegir un mòdul `MaintenanceRecord` (registres de manteniment de vehicles).
-
-### Pas 1 — Migració de tenant
+### 1. Migració (a `database/migrations/tenant/`)
 
 ```bash
-php artisan make:migration create_maintenance_records_table --path=database/migrations/tenant
+php artisan make:migration create_xxxx_table --path=database/migrations/tenant
 ```
 
-```php
-// database/migrations/tenant/YYYY_..._create_maintenance_records_table.php
-Schema::create('maintenance_records', function (Blueprint $table) {
-    $table->id();
-    $table->foreignId('vehicle_id')->constrained('vehicles', 'vehicle_id')->cascadeOnDelete();
-    $table->text('description');
-    $table->date('date');
-    $table->timestamps();
-});
-```
-
-### Pas 2 — Model
+### 2. Model
 
 ```bash
-php artisan make:model MaintenanceRecord
+php artisan make:model XxxModel
 ```
 
-```php
-// app/Models/MaintenanceRecord.php
-namespace App\Models;
+> **No cal indicar connexió ni schema.** El sistema commuta automàticament.
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
-
-class MaintenanceRecord extends Model
-{
-    use HasFactory;
-
-    protected $fillable = ['vehicle_id', 'description', 'date'];
-
-    public function vehicle()
-    {
-        return $this->belongsTo(Vehicle::class, 'vehicle_id', 'vehicle_id');
-    }
-}
-```
-
-> ⚠️ No cal indicar connexió de BD ni schema. El sistema commuta automàticament al schema del tenant actiu.
-
-### Pas 3 — Controlador
+### 3. Controlador
 
 ```bash
-php artisan make:controller Api/MaintenanceRecordController --api
+php artisan make:controller Api/XxxController --api
 ```
 
-Implementa els mètodes `index`, `store`, `show`, `update`, `destroy` dins la classe.
+Implementa `index`, `store`, `show`, `update`, `destroy`.
 
-### Pas 4 — Ruta a `routes/tenant.php`
+### 4. Ruta a `routes/tenant.php`
 
 ```php
-// Afegeix dins del grup auth:sanctum existent
-Route::apiResource('maintenance-records', MaintenanceRecordController::class);
+Route::apiResource('xxxx', XxxController::class);
 ```
 
-### Pas 5 — Aplicar la migració als tenants existents
+### 5. Aplicar a tenants existents
 
 ```bash
 docker compose exec api php artisan tenants:migrate
@@ -439,43 +322,20 @@ docker compose exec api php artisan tenants:migrate
 
 ## 11. Configuració local (DNS i ports)
 
-El projecte usa `lvh.me` com a domini base local. `lvh.me` és un domini públic gratuït el DNS del qual sempre resol qualsevol subdomini a `127.0.0.1`:
+**URL dels tenants:** `http://{id}.lvh.me:8000/api/...`
 
-```
-*.lvh.me  →  127.0.0.1  (via DNS públic, sense configurar res)
-```
+`lvh.me` és un domini públic el DNS del qual sempre resol a `127.0.0.1`. **No cal configurar res.**
 
-**No cal configurar cap fitxer de hosts ni cap servidor DNS.** Qualsevol màquina amb connexió a internet pot resoldre `empresa1.lvh.me` automàticament.
-
-### `.env` configurat per defecte
-
-```dotenv
-APP_URL=http://localhost:8000
-TENANT_BASE_DOMAIN=lvh.me
-```
-
-Les URLs dels tenants queden: `http://empresa1.lvh.me:8000/api/...`
-
-### Si no hi ha connexió a internet
-
-Com a alternativa, afegeix les entrades a mà a `/etc/hosts` (Linux/Mac) o `C:\Windows\System32\drivers\etc\hosts` (Windows):
-
+Si no tens connexió a internet, afegeix a `/etc/hosts`:
 ```bash
 echo "127.0.0.1 empresa1.lvh.me" | sudo tee -a /etc/hosts
 ```
-
-Cal una línia per cada tenant. **No recomanat per a ús diari.**
-
-### Port
-
-El servidor de l'API escolta al port **8000** en local (mapejat des del contenidor Docker).  
-L'URL d'un tenant en local té sempre la forma: `http://{id}.lvh.me:8000/api/...`
 
 ---
 
 ## 12. Pas a producció
 
-### Canvis al `.env`
+### Variables d'entorn
 
 ```dotenv
 APP_URL=https://api.sims.com
@@ -483,22 +343,18 @@ TENANT_BASE_DOMAIN=sims.com
 APP_DOMAIN=api.sims.com
 ```
 
-Amb aquests tres canvis, el codi genera automàticament:
-- Domini de tenant: `empresa1.sims.com`
-- URL d'accés: `https://empresa1.sims.com`
-- `central_domains` inclou: `127.0.0.1`, `localhost`, `sims.com`, `api.sims.com`
+Això genera automàticament:
+- URL tenant: `https://empresa1.sims.com`
+- `central_domains`: `['127.0.0.1', 'localhost', 'sims.com', 'api.sims.com']`
 
-### Infraestructura necessària (fora del codi)
+### Infraestructura necessària
 
-| Element | Detall |
-|---------|--------|
-| **DNS wildcard** | `*.sims.com → IP del servidor` (configurat al proveïdor DNS) |
-| **SSL wildcard** | `certbot --dns ... -d sims.com -d *.sims.com` |
-| **Nginx/proxy** | Escoltar ports 80/443, passar al contenidor API per header `Host:` |
-| **`APP_KEY`** | Generar un de nou: `php artisan key:generate` |
-| **Migracions** | `php artisan migrate --force` + `php artisan tenants:migrate --force` |
+- **DNS wildcard:** `*.sims.com → IP del servidor`
+- **SSL wildcard:** `certbot -d sims.com -d *.sims.com`
+- **Nginx/proxy:** Forwarding del port 80/443 al contenidor API
+- **Migracions:** `php artisan migrate --force` + `php artisan tenants:migrate --force`
 
-> El codi de l'aplicació **no necessita cap modificació** per al pas a producció.
+> El codi NO necessita canvis per a producció.
 
 ---
 
@@ -562,7 +418,7 @@ Eliminar el tenant **elimina el schema PostgreSQL sencer** i tots els seus recur
 
 ## 14. Tests dels tenants
 
-La suite de tests d'integració es troba a `tests/Tenant/` i cobreix el cicle de vida complet: login de SuperAdmin, creació i eliminació de tenants, login d'usuari admin, rebuig de tokens creuats i aïllament de dades entre tenants.
+La suite de tests es troba a `tests/Tenant/` i cobreix: login de SuperAdmin, creació/eliminació de tenants, login d'usuari admin, tokens creuats, aïllament de dades.
 
 ### Executar els tests
 
@@ -570,19 +426,8 @@ La suite de tests d'integració es troba a `tests/Tenant/` i cobreix el cicle de
 docker exec sims_api ./vendor/bin/phpunit --configuration=phpunit.tenants.xml
 ```
 
-Els tests s'han d'executar **dins del contenidor** perquè el PHP de l'host no té l'extensió `pdo_pgsql`. La configuració específica dels tests de tenant és a `phpunit.tenants.xml`.
+> S'han d'executar dins del contenidor (PHP de l'host no té `pdo_pgsql`).
 
 ### Per a CI (GitHub Actions)
 
-El workflow `.github/workflows/tenant-tests.yml` aixeca un service container de PostgreSQL i instal·la PHP amb `pdo_pgsql` directament al runner, sense necessitat de Docker Compose.
-
-### Problemes de state leak en tests (ja corregits)
-
-Laravel reutilitza el mateix procés PHP per a totes les peticions HTTP simulades en una classe de tests. Això crea dos problemes que no existeixen en producció (on cada petició té el seu propi procés PHP-FPM):
-
-| Problema | Causa | Solució aplicada |
-|----------|-------|------------------|
-| Connexió de BD del tenant anterior no es revertia | `InitializeTenancyBySubdomain` mai crida `tenancy()->end()` en retornar la resposta | `call()` sobreescrit al `TestCase` crida `tenancy()->end()` després de cada petició |
-| Sanctum retornava sempre el mateix usuari cachesat | `AuthManager` cacheja el guard i l'usuari resolts entre peticions | `Auth::forgetGuards()` es crida després de cada petició per netejar la caché |
-
-Aquestes correccions es fan a `TenantLifecycleTest::call()` i **no afecten el comportament en producció**.
+El workflow `.github/workflows/tenant-tests.yml` aixeca un service container de PostgreSQL amb `pdo_pgsql` directament al runner.
