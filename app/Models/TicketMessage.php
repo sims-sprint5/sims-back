@@ -29,7 +29,7 @@ class TicketMessage extends Model
         return $this->belongsTo(Ticket::class, 'ticket_id', 'ticket_id');
     }
 
-    /** Alias usado por el controlador para eager-loading */
+    /** Alias used by the controller for eager-loading */
     public function user()
     {
         return $this->belongsTo(User::class, 'sender_id', 'user_id');

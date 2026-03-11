@@ -23,7 +23,7 @@ class VehicleGeofenceLog extends Model
         'longitude' => 'decimal:8',
     ];
 
-    // Relaciones
+    // Relationships
     public function vehicle()
     {
         return $this->belongsTo(Vehicle::class, 'vehicle_id', 'vehicle_id');

@@ -11,7 +11,7 @@ class TicketMessageController extends Controller
 {
     /**
      * GET /v1/tickets/{ticket}/messages
-     * Devuelve el historial de mensajes de un ticket con nombre del usuario e is_admin.
+     * Returns the ticket message history with user name and is_admin status.
      */
     public function index(Request $request, Ticket $ticket)
     {
@@ -40,7 +40,7 @@ class TicketMessageController extends Controller
 
     /**
      * POST /v1/tickets/{ticket}/messages
-     * Crea un mensaje. user_id e is_admin se derivan del token, nunca del body.
+     * Creates a message. user_id and is_admin are derived from the token, never from the body.
      */
     public function store(Request $request, Ticket $ticket)
     {
@@ -55,9 +55,9 @@ class TicketMessageController extends Controller
 
         $ticketMessage = TicketMessage::create([
             'ticket_id' => $ticket->getKey(),
-            'sender_id' => $user->getKey(),          // siempre del token
+            'sender_id' => $user->getKey(),          // always from the token
             'message'   => $validated['message'],
-            'is_admin'  => $user->role === 'admin',  // calculado del token
+            'is_admin'  => $user->role === 'admin',  // calculated from the token
         ]);
 
         $ticketMessage->load('user');

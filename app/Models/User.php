@@ -33,7 +33,7 @@ class User extends Authenticatable
         'password' => 'hashed',
     ];
 
-    // Relaciones
+    // Relationships
     public function tickets()
     {
         return $this->hasMany(Ticket::class, 'user_id', 'user_id');

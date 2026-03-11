@@ -31,7 +31,7 @@ class Vehicle extends Model
         'last_location_update' => 'datetime',
     ];
 
-    // Relaciones
+    // Relationships
     public function reservations()
     {
         return $this->hasMany(Reservation::class, 'vehicle_id', 'vehicle_id');

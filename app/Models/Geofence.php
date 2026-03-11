@@ -28,7 +28,7 @@ class Geofence extends Model
         'polygon_coordinates' => 'array',
     ];
 
-    // Relaciones
+    // Relationships
     public function vehicleLogs()
     {
         return $this->hasMany(VehicleGeofenceLog::class, 'geofence_id', 'geofence_id');

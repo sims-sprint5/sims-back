@@ -30,7 +30,7 @@ class Reservation extends Model
         'total_cost' => 'decimal:2',
     ];
 
-    // Relaciones
+    // Relationships
     public function user()
     {
         return $this->belongsTo(User::class, 'user_id', 'user_id');
