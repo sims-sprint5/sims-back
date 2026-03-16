@@ -159,6 +159,47 @@ CACHE_STORE=database
 SESSION_DRIVER=database
 ```
 
+## ☁️ Despliegue en DigitalOcean (IP `178.62.229.151`)
+
+1. Crea tu archivo de entorno para servidor:
+
+```bash
+cp .env.digitalocean.example .env
+```
+
+2. Genera la key de Laravel:
+
+```bash
+docker compose run --rm api php artisan key:generate --ansi
+```
+
+3. Levanta servicios en el droplet:
+
+```bash
+docker compose up -d --build
+```
+
+4. Ejecuta migraciones:
+
+```bash
+docker compose exec api php artisan migrate --force
+docker compose exec api php artisan tenants:migrate --force
+```
+
+5. (Opcional) Seeder inicial:
+
+```bash
+docker compose exec api php artisan db:seed --force
+```
+
+### Nota importante multi-tenant con IP
+
+Con solo una IP pública no puedes usar subdominios tipo `empresa1.178.62.229.151`.
+Para mantener el esquema por subdominio sin comprar dominio, esta configuración usa `nip.io`:
+
+- central: `http://178.62.229.151:8000`
+- tenant: `http://empresa1.178.62.229.151.nip.io:8000`
+
 ---
 
 ## ▶️ Ejecución del Proyecto

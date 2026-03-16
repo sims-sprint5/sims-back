@@ -44,10 +44,17 @@ services:
       DB_DATABASE: ${DB_DATABASE:-sims}
       DB_USERNAME: ${DB_USERNAME:-sims_user}
       DB_PASSWORD: ${DB_PASSWORD:-sims_password}
-      APP_ENV: local
-      APP_DEBUG: true
+      APP_ENV: ${APP_ENV:-production}
+      APP_DEBUG: ${APP_DEBUG:-false}
       APP_KEY: ${APP_KEY:-}
-      APP_URL: http://localhost:8000
+      APP_URL: ${APP_URL:-http://178.62.229.151}
+      APP_DOMAIN: ${APP_DOMAIN:-178.62.229.151}
+      TENANT_BASE_DOMAIN: ${TENANT_BASE_DOMAIN:-178.62.229.151.nip.io}
+      FRONTEND_URL: ${FRONTEND_URL:-http://178.62.229.151}
+      SESSION_DOMAIN: ${SESSION_DOMAIN:-.178.62.229.151.nip.io}
+      SANCTUM_STATEFUL_DOMAINS: ${SANCTUM_STATEFUL_DOMAINS:-178.62.229.151,178.62.229.151:8000,178.62.229.151.nip.io,.178.62.229.151.nip.io}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://178.62.229.151,http://178.62.229.151:8000}
+      CORS_ALLOWED_ORIGINS_PATTERNS: ${CORS_ALLOWED_ORIGINS_PATTERNS:-#^https?://[a-z0-9\-]+\.178\.62\.229\.151\.nip\.io(:\d+)?$#i}
     ports:
       - "8000:8000"
     volumes:
