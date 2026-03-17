@@ -77,6 +77,24 @@ class TenantController extends Controller
         return response()->json($tenant);
     }
 
+    public function update (string $id, Request $request)
+    {
+        $request->validate([
+            'name' => 'sometimes|required|string|max:255',
+            'admin_name' => 'nullable|string|max:255',
+            'adnim_email' => 'nullable|email|max:255',
+            'admin_password' => 'nullable|string|main:8'
+        ]);
+
+        $tenant = Tenant::with('domains')->findOrFail($id);
+        $tenant->update($request->only(['name', 'admin_name', 'admin_email', 'admin_password']));
+
+        return response()->json([
+            'message' => 'Tenant updated successfully',
+            'tenant' => $tenant,
+        ]);
+    }
+
     public function destroy(string $id)
     {
         $tenant = Tenant::findOrFail($id);
