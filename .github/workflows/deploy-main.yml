@@ -1,0 +1,110 @@
+name: Deploy Main to DigitalOcean
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    name: Run Tests
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create CI env file for docker-compose
+        run: |
+          printf '%s\n' \
+            "DB_USERNAME=postgres" \
+            "DB_PASSWORD=postgres" \
+            "DB_DATABASE=sims_test" \
+            "DB_PORT=5432" \
+            "APP_ENV=testing" > .env.ci
+
+      - name: Build Docker image
+        run: docker compose --env-file .env.ci build api
+
+      - name: Start PostgreSQL
+        run: docker compose --env-file .env.ci up -d postgres
+
+      - name: Ensure storage and cache dirs exist
+        run: |
+          docker compose --env-file .env.ci run --rm api bash -lc "
+            mkdir -p bootstrap/cache \
+              storage/logs \
+              storage/framework/cache \
+              storage/framework/sessions \
+              storage/framework/testing \
+              storage/framework/views \
+            && chmod -R 775 bootstrap/cache storage
+          "
+
+      - name: Install dependencies
+        run: docker compose --env-file .env.ci run --rm api composer install --prefer-dist --no-interaction --no-progress
+
+      - name: Generate APP_KEY and add to .env.ci
+        run: |
+          KEY=$(docker compose --env-file .env.ci run --rm -e APP_ENV=testing api php artisan key:generate --show)
+          echo "APP_KEY=$KEY" >> .env.ci
+
+      - name: Run Pint
+        run: docker compose --env-file .env.ci run --rm api vendor/bin/pint --test
+
+      - name: Run migrations (retry until DB ready)
+        run: |
+          docker compose --env-file .env.ci run --rm -e APP_ENV=testing api bash -lc '
+            for i in $(seq 1 30); do
+              php artisan migrate --no-interaction && break || sleep 2;
+            done
+          '
+
+      - name: Run tests
+        run: docker compose --env-file .env.ci run --rm -e APP_ENV=testing api php artisan test
+
+      - name: Tear down Docker Compose
+        if: always()
+        run: docker compose --env-file .env.ci down --volumes --remove-orphans
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    name: Deploy to DigitalOcean
+    if: success()
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.DEPLOY_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Pull latest code
+        run: |
+          ssh -i ~/.ssh/deploy_key ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
+            "cd /var/www/sims-back && git pull origin main"
+
+      - name: Build and start Docker containers
+        run: |
+          ssh -i ~/.ssh/deploy_key ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
+            "cd /var/www/sims-back && docker-compose build && docker-compose up -d"
+
+      - name: Run Laravel migrations
+        run: |
+          ssh -i ~/.ssh/deploy_key ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
+            "cd /var/www/sims-back && docker-compose exec -T api php artisan migrate --force"
+
+      - name: Restart containers
+        run: |
+          ssh -i ~/.ssh/deploy_key ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
+            "cd /var/www/sims-back && docker-compose restart"
+
+      - name: Verify deployment
+        run: |
+          ssh -i ~/.ssh/deploy_key ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
+            "docker ps --filter label=com.docker.compose.project=sims-back"
