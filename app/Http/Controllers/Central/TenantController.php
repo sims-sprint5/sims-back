@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Central;
 use App\Http\Controllers\Controller;
 use App\Models\Tenant;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
 
 class TenantController extends Controller
@@ -47,30 +46,6 @@ class TenantController extends Controller
         ]);
 
         $tenant->domains()->create(['domain' => $tenantId]);
-
-        // Run seed explicitly (isolated from schema+migrate pipeline).
-        // If the seed fails, roll back the tenant creation so the DB stays
-        // consistent and the caller receives a clear 500 error instead of a
-        // silent partial-success.
-        try {
-            Log::info("Starting seed for tenant '{$tenantId}'...");
-
-            // Seed directly without using the job
-            tenancy()->initialize($tenant);
-            Artisan::call('db:seed', ['--class' => 'TenantDatabaseSeeder']);
-            tenancy()->end();
-
-            Log::info("Seed completed for tenant '{$tenantId}'");
-        } catch (\Throwable $e) {
-            Log::error("Tenant seed failed for '{$tenantId}': ".$e->getMessage());
-            Log::error($e->getTraceAsString());
-            $tenant->delete();
-
-            return response()->json([
-                'message' => 'Tenant creation failed during database seeding.',
-                'error' => $e->getMessage(),
-            ], 500);
-        }
 
         // Generate SSL certificate synchronously
         $domain = "{$tenantId}.{$baseDomain}";

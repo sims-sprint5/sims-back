@@ -26,7 +26,7 @@ class TenancyServiceProvider extends ServiceProvider
                 JobPipeline::make([
                     Jobs\CreateDatabase::class,
                     Jobs\MigrateDatabase::class,
-
+                    Jobs\SeedDatabase::class,
                 ])->send(function (Events\TenantCreated $event) {
                     return $event->tenant;
                 })->shouldBeQueued(false),
