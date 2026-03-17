@@ -23,7 +23,6 @@ class TenantLifecycleTest extends TestCase
     /** Run central migrations once per test class, not before every test. */
     private static bool $migrated = false;
 
-
     public function call($method, $uri, $parameters = [], $cookies = [], $files = [], $server = [], $content = null)
     {
         $response = parent::call($method, $uri, $parameters, $cookies, $files, $server, $content);

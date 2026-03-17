@@ -58,7 +58,7 @@ class CorsMiddleware
      */
     protected function isOriginAllowed(?string $origin, array $config): bool
     {
-        if (!$origin) {
+        if (! $origin) {
             return false;
         }
 
@@ -80,7 +80,7 @@ class CorsMiddleware
 
         $tenantBaseDomain = trim((string) env('TENANT_BASE_DOMAIN', ''));
         if ($tenantBaseDomain !== '' && is_string($originHost)) {
-            if ($originHost === $tenantBaseDomain || str_ends_with($originHost, '.'.$tenantBaseDomain)) {
+            if ($originHost === $tenantBaseDomain || str_ends_with($originHost, '.' . $tenantBaseDomain)) {
                 return true;
             }
         }
