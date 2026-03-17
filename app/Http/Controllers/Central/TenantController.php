@@ -47,17 +47,29 @@ class TenantController extends Controller
 
         $tenant->domains()->create(['domain' => $tenantId]);
 
-        // Generate SSL certificate synchronously
+        // Generate SSL certificate synchronously using Name.com DNS-01 script
         $domain = "{$tenantId}.{$baseDomain}";
-        $certEmail = env('CERT_EMAIL', 'admin@simsgrup2.app');
+        $sslScriptPath = base_path((string) env('SSL_DNS_SCRIPT_PATH', 'scripts/namecom_certbot_dns01.py'));
 
         try {
-            Log::info("Generating SSL certificate for {$domain}...");
+            Log::info("Generating SSL certificate for {$domain} using DNS-01 script...");
 
-            $command = "sudo certbot --nginx -d {$domain} --non-interactive --agree-tos -m {$certEmail} 2>&1";
+            if (! file_exists($sslScriptPath)) {
+                throw new \RuntimeException("SSL script not found at: {$sslScriptPath}");
+            }
+
+            $command = sprintf(
+                'python3 %s --mode issue --domain %s --subdomain %s 2>&1',
+                escapeshellarg($sslScriptPath),
+                escapeshellarg($baseDomain),
+                escapeshellarg($tenantId)
+            );
             $output = shell_exec($command);
 
-            Log::info("SSL certificate generated for {$domain}");
+            Log::info("SSL certificate command executed for {$domain}", [
+                'script' => $sslScriptPath,
+                'output' => $output,
+            ]);
         } catch (\Throwable $e) {
             Log::warning("SSL generation warning for {$domain}: ".$e->getMessage());
             // Don't fail tenant creation if SSL fails
