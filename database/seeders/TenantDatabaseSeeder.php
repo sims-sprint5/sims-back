@@ -20,7 +20,11 @@ class TenantDatabaseSeeder extends Seeder
         // and accessed via the tenant() helper.
         $adminName = tenant('admin_name') ?? 'Admin '.ucfirst($tenantId);
         $adminEmail = tenant('admin_email') ?? "admin@{$tenantId}.local";
-        $adminPassword = tenant('admin_password') ?? 'password123';
+        $defaultTenantAdminPassword = (string) env('TENANT_DEFAULT_ADMIN_PASSWORD', 'password123');
+        $adminPassword = tenant('admin_password');
+        if (! is_string($adminPassword) || trim($adminPassword) === '') {
+            $adminPassword = $defaultTenantAdminPassword;
+        }
 
         $admin = User::create([
             'name' => $adminName,

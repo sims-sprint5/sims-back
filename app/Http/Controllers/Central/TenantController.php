@@ -27,6 +27,10 @@ class TenantController extends Controller
 
         $tenantId = $request->id;
         $baseDomain = env('TENANT_BASE_DOMAIN', 'localhost');
+        $defaultTenantAdminPassword = (string) env('TENANT_DEFAULT_ADMIN_PASSWORD', 'password123');
+        $adminPassword = $request->filled('admin_password')
+            ? (string) $request->admin_password
+            : $defaultTenantAdminPassword;
 
         $parsed = parse_url(config('app.url'));
         $scheme = $parsed['scheme'] ?? 'http';
@@ -39,7 +43,7 @@ class TenantController extends Controller
             'name' => $request->name,
             'admin_name' => $request->admin_name ?? 'Admin '.ucfirst($tenantId),
             'admin_email' => $adminEmail,
-            'admin_password' => $request->admin_password ?? '',
+            'admin_password' => $adminPassword,
         ]);
 
         $tenant->domains()->create(['domain' => $tenantId]);
@@ -66,6 +70,7 @@ class TenantController extends Controller
             'access' => [
                 'url' => "{$scheme}://{$tenantId}.{$baseDomain}{$port}",
                 'admin_email' => $adminEmail,
+                'admin_password' => $adminPassword,
             ],
         ], 201);
     }
