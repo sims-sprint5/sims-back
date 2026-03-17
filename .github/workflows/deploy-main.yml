@@ -84,8 +84,12 @@ jobs:
           SSH_USER: ${{ secrets.DEPLOY_USER }}
         run: |
           mkdir -p ~/.ssh
-          echo "$SSH_KEY" | base64 -d > ~/.ssh/deploy_key
+          echo "$SSH_KEY_B64" | base64 -d > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
+          echo "=== Key file size ===" 
+          wc -c ~/.ssh/deploy_key
+          echo "=== First 5 lines ===" 
+          head -5 ~/.ssh/deploy_key
           ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
           cat >> ~/.ssh/config << EOF
           Host deploy
