@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Central;
 use App\Http\Controllers\Controller;
 use App\Models\Tenant;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
 
 class TenantController extends Controller
@@ -46,6 +47,36 @@ class TenantController extends Controller
         ]);
 
         $tenant->domains()->create(['domain' => $tenantId]);
+
+        try {
+            Log::info("Running tenant migrations for '{$tenantId}'...");
+            Artisan::call('tenants:migrate', [
+                '--tenants' => [$tenantId],
+                '--force' => true,
+            ]);
+            $migrateOutput = Artisan::output();
+
+            Log::info("Running tenant seeder for '{$tenantId}'...");
+            Artisan::call('tenants:seed', [
+                '--tenants' => [$tenantId],
+                '--force' => true,
+            ]);
+            $seedOutput = Artisan::output();
+
+            Log::info("Tenant database initialized for '{$tenantId}'", [
+                'migrate_output' => $migrateOutput,
+                'seed_output' => $seedOutput,
+            ]);
+        } catch (\Throwable $e) {
+            Log::error("Tenant bootstrap failed for '{$tenantId}': ".$e->getMessage());
+            Log::error($e->getTraceAsString());
+            $tenant->delete();
+
+            return response()->json([
+                'message' => 'Tenant creation failed during migrate/seed.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
 
         // Generate SSL certificate synchronously using Name.com DNS-01 script
         $domain = "{$tenantId}.{$baseDomain}";

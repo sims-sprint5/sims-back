@@ -71,6 +71,20 @@ APP_DEBUG=false
 APP_URL=http://YOUR_SERVER_IP
 APP_DOMAIN=YOUR_SERVER_IP
 TENANT_BASE_DOMAIN=YOUR_DOMAIN.app
+TENANT_DEFAULT_ADMIN_PASSWORD=change_this_tenant_password
+
+CERT_EMAIL=admin@YOUR_DOMAIN.app
+SSL_DNS_SCRIPT_PATH=scripts/namecom_certbot_dns01.py
+API_USER=your_namecom_api_user
+API_TOKEN=your_namecom_api_token
+CERTBOT_BIN=certbot
+CERTBOT_CONFIG_DIR=/etc/letsencrypt
+CERTBOT_WORK_DIR=/var/lib/letsencrypt
+CERTBOT_LOGS_DIR=/var/log/letsencrypt
+DNS_PROPAGATION_TIMEOUT=180
+DNS_PROPAGATION_INTERVAL=15
+DNS_PROPAGATION_INITIAL_WAIT=20
+DNS_TTL=60
 
 APP_LOCALE=en
 APP_FALLBACK_LOCALE=en
@@ -115,6 +129,8 @@ Archivo `.github/workflows/deploy-main.yml` está configurado para:
 5. ✅ Ejecutar seeders (crea SuperAdmin)
 
 **Solo necesitas hacer push a `main` y automáticamente se deploya.**
+
+> Nota: para SSL dinámico por tenant con dns-01, asegúrate de tener `API_USER`, `API_TOKEN` y `CERT_EMAIL` configurados en el `.env` de producción.
 
 ---
 
@@ -236,16 +252,31 @@ Value: YOUR_SERVER_IP
 
 ---
 
-## 11. SSL Certificates para Tenants
+## 11. SSL Certificates para Tenants (Automático DNS-01)
 
 ```bash
 ssh -i ~/.ssh/deploy_key root@YOUR_SERVER_IP
 
-# Generar certificado para un tenant
-sudo certbot --nginx -d empresa1.YOUR_DOMAIN.app --non-interactive --agree-tos -m tu@email.com
+# Entrar al proyecto
+cd /var/www/sims-back
+
+# Probar generación manual con el script (si quieres validar)
+docker-compose exec api python3 scripts/namecom_certbot_dns01.py \
+  --mode issue \
+  --domain YOUR_DOMAIN.app \
+  --subdomain empresa1
 ```
 
-**Se renueva automáticamente** (certbot cron job).
+### Flujo automático al crear tenant
+- Al crear tenant (`POST /api/v1/superadmin/tenants`), el backend intenta emitir SSL para `tenant.YOUR_DOMAIN.app`.
+- El script crea el TXT `_acme-challenge`, espera propagación DNS y ejecuta certbot con `dns-01`.
+- Al finalizar, elimina el TXT para mantener el DNS limpio.
+
+### Requisitos para que funcione
+- Dominio gestionado en Name.com con API habilitada.
+- `API_USER` y `API_TOKEN` válidos en `.env`.
+- `CERT_EMAIL` definido.
+- DNS wildcard o registros A apuntando al servidor para los subdominios tenant.
 
 ---
 
@@ -291,6 +322,20 @@ docker-compose exec api php artisan tenants:seed --tenants=empresa1
 - Espera 10 segundos después de crear el tenant
 - El seeding se ejecuta automáticamente
 - Si no, ejecuta comando anterior
+
+### SSL no se genera al crear tenant
+```bash
+# Ver logs de la API y buscar salida del script DNS-01
+docker-compose logs api | grep -i "ssl\|certbot\|dns\|acme\|name.com"
+
+# Probar script manualmente dentro del contenedor API
+docker-compose exec api python3 scripts/namecom_certbot_dns01.py \
+  --mode issue \
+  --domain YOUR_DOMAIN.app \
+  --subdomain empresa1
+```
+
+Si falla, revisa primero `API_USER`, `API_TOKEN`, `CERT_EMAIL` y que el dominio esté en Name.com.
 
 ### Migrations no se ejecutan
 ```bash
