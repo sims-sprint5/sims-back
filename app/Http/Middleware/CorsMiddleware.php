@@ -17,7 +17,7 @@ class CorsMiddleware
         $origin = $request->header('Origin');
 
         // Check if origin is allowed
-        if (!$this->isOriginAllowed($origin, $config)) {
+        if (! $this->isOriginAllowed($origin, $config)) {
             // If not a preflight request, continue without CORS headers
             if ($request->method() !== 'OPTIONS') {
                 return $next($request);
@@ -80,7 +80,7 @@ class CorsMiddleware
 
         $tenantBaseDomain = trim((string) env('TENANT_BASE_DOMAIN', ''));
         if ($tenantBaseDomain !== '' && is_string($originHost)) {
-            if ($originHost === $tenantBaseDomain || str_ends_with($originHost, '.' . $tenantBaseDomain)) {
+            if ($originHost === $tenantBaseDomain || str_ends_with($originHost, '.'.$tenantBaseDomain)) {
                 return true;
             }
         }
