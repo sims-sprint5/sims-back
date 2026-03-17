@@ -53,9 +53,12 @@ class TenantController extends Controller
         // consistent and the caller receives a clear 500 error instead of a
         // silent partial-success.
         try {
+            Log::info("Starting seed for tenant '{$tenantId}'...");
             SeedDatabase::dispatchSync($tenant);
+            Log::info("Seed completed for tenant '{$tenantId}'");
         } catch (\Throwable $e) {
             Log::error("Tenant seed failed for '{$tenantId}': ".$e->getMessage());
+            Log::error($e->getTraceAsString());
             $tenant->delete();
 
             return response()->json([
