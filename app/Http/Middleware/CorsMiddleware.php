@@ -17,11 +17,12 @@ class CorsMiddleware
         $origin = $request->header('Origin');
 
         // Check if origin is allowed
-        if (!$this->isOriginAllowed($origin, $config)) {
+        if (! $this->isOriginAllowed($origin, $config)) {
             // If not a preflight request, continue without CORS headers
             if ($request->method() !== 'OPTIONS') {
                 return $next($request);
             }
+
             // Otherwise deny preflight
             return response('', 403);
         }
@@ -58,7 +59,7 @@ class CorsMiddleware
      */
     protected function isOriginAllowed(?string $origin, array $config): bool
     {
-        if (!$origin) {
+        if (! $origin) {
             return false;
         }
 
