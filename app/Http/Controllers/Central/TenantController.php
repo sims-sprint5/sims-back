@@ -49,27 +49,27 @@ class TenantController extends Controller
         $tenant->domains()->create(['domain' => $tenantId]);
 
         try {
-            Log::info("Running tenant migrations for '{$tenantId}'...");
+            $this->safeLog('info', "Running tenant migrations for '{$tenantId}'...");
             Artisan::call('tenants:migrate', [
                 '--tenants' => [$tenantId],
                 '--force' => true,
             ]);
             $migrateOutput = Artisan::output();
 
-            Log::info("Running tenant seeder for '{$tenantId}'...");
+            $this->safeLog('info', "Running tenant seeder for '{$tenantId}'...");
             Artisan::call('tenants:seed', [
                 '--tenants' => [$tenantId],
                 '--force' => true,
             ]);
             $seedOutput = Artisan::output();
 
-            Log::info("Tenant database initialized for '{$tenantId}'", [
+            $this->safeLog('info', "Tenant database initialized for '{$tenantId}'", [
                 'migrate_output' => $migrateOutput,
                 'seed_output' => $seedOutput,
             ]);
         } catch (\Throwable $e) {
-            Log::error("Tenant bootstrap failed for '{$tenantId}': ".$e->getMessage());
-            Log::error($e->getTraceAsString());
+            $this->safeLog('error', "Tenant bootstrap failed for '{$tenantId}': ".$e->getMessage());
+            $this->safeLog('error', $e->getTraceAsString());
             $tenant->delete();
 
             return response()->json([
@@ -83,7 +83,7 @@ class TenantController extends Controller
         $sslScriptPath = base_path((string) env('SSL_DNS_SCRIPT_PATH', 'scripts/namecom_certbot_dns01.py'));
 
         try {
-            Log::info("Generating SSL certificate for {$domain} using DNS-01 script...");
+            $this->safeLog('info', "Generating SSL certificate for {$domain} using DNS-01 script...");
 
             if (! file_exists($sslScriptPath)) {
                 throw new \RuntimeException("SSL script not found at: {$sslScriptPath}");
@@ -97,12 +97,12 @@ class TenantController extends Controller
             );
             $output = shell_exec($command);
 
-            Log::info("SSL certificate command executed for {$domain}", [
+            $this->safeLog('info', "SSL certificate command executed for {$domain}", [
                 'script' => $sslScriptPath,
                 'output' => $output,
             ]);
         } catch (\Throwable $e) {
-            Log::warning("SSL generation warning for {$domain}: ".$e->getMessage());
+            $this->safeLog('warning', "SSL generation warning for {$domain}: ".$e->getMessage());
             // Don't fail tenant creation if SSL fails
         }
 
@@ -130,5 +130,13 @@ class TenantController extends Controller
         $tenant->delete();
 
         return response()->json(['message' => "Tenant '{$id}' deleted successfully."]);
+    }
+
+    private function safeLog(string $level, string $message, array $context = []): void
+    {
+        try {
+            Log::{$level}($message, $context);
+        } catch (\Throwable $e) {
+        }
     }
 }

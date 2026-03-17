@@ -8,7 +8,10 @@ Route::get('/', function (Request $request) {
     $centralDomains = config('tenancy.central_domains', ['localhost', '127.0.0.1']);
 
     if (in_array($host, $centralDomains)) {
-        return view('welcome');
+        return response()->json([
+            'message' => 'SIMS API',
+            'status' => 'ok',
+        ]);
     }
 
     return response()->json(['message' => 'Not found.'], 404);

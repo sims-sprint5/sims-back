@@ -35,7 +35,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    user: "${UID}:${GID}"
+    user: "${UID:-33}:${GID:-33}"
     container_name: sims_api
     environment:
       DB_CONNECTION: pgsql
