@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Tenant;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Artisan;
 use Stancl\Tenancy\Jobs\SeedDatabase;
 
 class TenantController extends Controller
@@ -54,7 +55,12 @@ class TenantController extends Controller
         // silent partial-success.
         try {
             Log::info("Starting seed for tenant '{$tenantId}'...");
-            SeedDatabase::dispatchSync($tenant);
+            
+            // Seed directly without using the job
+            tenancy()->initialize($tenant);
+            Artisan::call('db:seed', ['--class' => 'TenantDatabaseSeeder']);
+            tenancy()->end();
+            
             Log::info("Seed completed for tenant '{$tenantId}'");
         } catch (\Throwable $e) {
             Log::error("Tenant seed failed for '{$tenantId}': ".$e->getMessage());
@@ -65,6 +71,22 @@ class TenantController extends Controller
                 'message' => 'Tenant creation failed during database seeding.',
                 'error' => $e->getMessage(),
             ], 500);
+        }
+
+        // Generate SSL certificate synchronously
+        $domain = "{$tenantId}.{$baseDomain}";
+        $certEmail = env('CERT_EMAIL', 'admin@simsgrup2.app');
+        
+        try {
+            Log::info("Generating SSL certificate for {$domain}...");
+            
+            $command = "sudo certbot --nginx -d {$domain} --non-interactive --agree-tos -m {$certEmail} 2>&1";
+            $output = shell_exec($command);
+            
+            Log::info("SSL certificate generated for {$domain}");
+        } catch (\Throwable $e) {
+            Log::warning("SSL generation warning for {$domain}: ".$e->getMessage());
+            // Don't fail tenant creation if SSL fails
         }
 
         return response()->json([
