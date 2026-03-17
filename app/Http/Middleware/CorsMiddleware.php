@@ -62,6 +62,8 @@ class CorsMiddleware
             return false;
         }
 
+        $originHost = parse_url($origin, PHP_URL_HOST);
+
         // Check against exact origins
         foreach ($config['allowed_origins'] as $allowedOrigin) {
             if ($origin === $allowedOrigin) {
@@ -72,6 +74,13 @@ class CorsMiddleware
         // Check against regex patterns
         foreach ($config['allowed_origins_patterns'] as $pattern) {
             if (preg_match($pattern, $origin)) {
+                return true;
+            }
+        }
+
+        $tenantBaseDomain = trim((string) env('TENANT_BASE_DOMAIN', ''));
+        if ($tenantBaseDomain !== '' && is_string($originHost)) {
+            if ($originHost === $tenantBaseDomain || str_ends_with($originHost, '.'.$tenantBaseDomain)) {
                 return true;
             }
         }
