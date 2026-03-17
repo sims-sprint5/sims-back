@@ -21,7 +21,7 @@ class TicketMessage extends Model
 
     protected $casts = [
         'created_at' => 'datetime',
-        'is_admin'   => 'boolean',
+        'is_admin' => 'boolean',
     ];
 
     public function ticket()

@@ -8,7 +8,6 @@ use Illuminate\Foundation\Testing\WithFaker;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
-
 class TenantLifecycleTest extends TestCase
 {
     use WithFaker;
@@ -43,7 +42,7 @@ class TenantLifecycleTest extends TestCase
         parent::setUp();
 
         // Run central migrations once per test-class execution.
-        if (! self::$migrated) {
+        if (!self::$migrated) {
             $this->artisan('migrate', ['--force' => true]);
             self::$migrated = true;
         }

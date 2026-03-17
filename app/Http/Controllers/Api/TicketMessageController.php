@@ -45,7 +45,7 @@ class TicketMessageController extends Controller
     public function store(Request $request, Ticket $ticket)
     {
         $user = $request->user();
-        if (!$user) {
+        if (! $user) {
             return response()->json(['message' => 'Unauthorized'], 401);
         }
 

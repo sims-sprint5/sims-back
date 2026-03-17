@@ -3,7 +3,6 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
-
 Route::get('/', function (Request $request) {
     $host = $request->getHost();
     $centralDomains = config('tenancy.central_domains', ['localhost', '127.0.0.1']);
