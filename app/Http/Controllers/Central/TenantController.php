@@ -82,12 +82,31 @@ class TenantController extends Controller
         $request->validate([
             'name' => 'sometimes|required|string|max:255',
             'admin_name' => 'nullable|string|max:255',
-            'adnim_email' => 'nullable|email|max:255',
-            'admin_password' => 'nullable|string|main:8'
+            'admin_email' => 'nullable|email|max:255',
+            'admin_password' => 'nullable|string|min:8'
         ]);
 
         $tenant = Tenant::with('domains')->findOrFail($id);
-        $tenant->update($request->only(['name', 'admin_name', 'admin_email', 'admin_password']));
+
+        $data = $request->only(['name', 'admin_name', 'admin_email']);
+
+        $tenant->update($data);
+
+        if ($request->filled('admin_password')) {
+            $tenant->update(['admin_password' => $request->admin_password]);
+
+            tenancy()->initialize($tenant);
+
+            $admin = \App\Models\User::where('email', $tenant->admin_email)->first();
+            if ($admin) {
+                $admin->password = \Illuminate\Support\Facades\Hash::make($request->admin_password);
+                $admin->save();
+            }
+
+            tenancy()->end();
+
+            $tenant->update(['admin_password' => null]);
+        }
 
         return response()->json([
             'message' => 'Tenant updated successfully',
