@@ -114,7 +114,7 @@ jobs:
           SSH_HOST: ${{ secrets.DEPLOY_HOST }}
         run: |
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" \
-            "cd /var/www/sims-back && docker-compose build && docker-compose up -d"
+            "cd /var/www/sims-back && docker-compose down --volumes && docker-compose build && docker-compose up -d"
 
       - name: Run Laravel migrations
         env:
@@ -122,7 +122,7 @@ jobs:
           SSH_HOST: ${{ secrets.DEPLOY_HOST }}
         run: |
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" \
-            "cd /var/www/sims-back && docker-compose exec -T api php artisan migrate --force"
+            "cd /var/www/sims-back && sleep 10 && for i in $(seq 1 5); do docker-compose exec -T api php artisan migrate --force && break || sleep 5; done"
 
       - name: Restart containers
         env:
