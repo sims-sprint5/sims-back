@@ -21,6 +21,7 @@ class GenerateTenantCertificates extends Command
 
         if ($tenants->isEmpty()) {
             $this->info('No tenants found.');
+
             return Command::SUCCESS;
         }
 

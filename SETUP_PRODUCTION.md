@@ -40,7 +40,7 @@ Settings → Secrets and variables → Actions → New repository secret
 | Name | Value |
 |---|---|
 | `DEPLOY_SSH_KEY_B64` | Output de `cat ~/.ssh/deploy_key \| base64 -w 0` |
-| `DEPLOY_HOST` | `178.62.229.151` |
+| `DEPLOY_HOST` | `YOUR_SERVER_IP` |
 | `DEPLOY_USER` | `root` |
 
 ---
@@ -48,7 +48,7 @@ Settings → Secrets and variables → Actions → New repository secret
 ## 3. DigitalOcean - Archivo .env
 
 ```bash
-ssh -i ~/.ssh/deploy_key root@178.62.229.151
+ssh -i ~/.ssh/deploy_key root@YOUR_SERVER_IP
 nano /var/www/sims-back/.env
 ```
 
@@ -62,15 +62,15 @@ SUPERADMIN_PASSWORD=change_this_superadmin_password
 PGADMIN_EMAIL=pgadmin@example.com
 PGADMIN_PASSWORD=change_this_pgadmin_password
 
-FRONTEND_URL=http://178.62.229.151
+FRONTEND_URL=http://YOUR_SERVER_IP
 
 APP_NAME=Sims
 APP_ENV=production
 APP_KEY=
 APP_DEBUG=false
-APP_URL=http://178.62.229.151
-APP_DOMAIN=178.62.229.151
-TENANT_BASE_DOMAIN=simsgrup2.app
+APP_URL=http://YOUR_SERVER_IP
+APP_DOMAIN=YOUR_SERVER_IP
+TENANT_BASE_DOMAIN=YOUR_DOMAIN.app
 
 APP_LOCALE=en
 APP_FALLBACK_LOCALE=en
@@ -93,11 +93,11 @@ SESSION_DRIVER=database
 SESSION_LIFETIME=120
 SESSION_ENCRYPT=false
 SESSION_PATH=/
-SESSION_DOMAIN=.simsgrup2.app
-SANCTUM_STATEFUL_DOMAINS=178.62.229.151,178.62.229.151:8000,simsgrup2.app,*.simsgrup2.app
+SESSION_DOMAIN=.YOUR_DOMAIN.app
+SANCTUM_STATEFUL_DOMAINS=YOUR_SERVER_IP,YOUR_SERVER_IP:8000,YOUR_DOMAIN.app,*.YOUR_DOMAIN.app
 
-CORS_ALLOWED_ORIGINS=http://178.62.229.151,http://178.62.229.151:8000
-CORS_ALLOWED_ORIGINS_PATTERNS="#^https?://[a-z0-9-]+[.]simsgrup2[.]app(:[0-9]+)?$#i"
+CORS_ALLOWED_ORIGINS=http://YOUR_SERVER_IP,http://YOUR_SERVER_IP:8000
+CORS_ALLOWED_ORIGINS_PATTERNS="#^https?://[a-z0-9-]+[.]YOUR_DOMAIN[.]app(:[0-9]+)?$#i"
 
 BROADCAST_CONNECTION=log
 FILESYSTEM_DISK=local
@@ -121,7 +121,7 @@ Archivo `.github/workflows/deploy-main.yml` está configurado para:
 ## 5. Primeros Comandos en DigitalOcean
 
 ```bash
-ssh -i ~/.ssh/deploy_key root@178.62.229.151
+ssh -i ~/.ssh/deploy_key root@YOUR_SERVER_IP
 
 # Ir al proyecto
 cd /var/www/sims-back
@@ -141,7 +141,7 @@ docker-compose exec api php artisan command
 ## 6. Crear SuperAdmin Inicial
 
 ```bash
-ssh -i ~/.ssh/deploy_key root@178.62.229.151
+ssh -i ~/.ssh/deploy_key root@YOUR_SERVER_IP
 cd /var/www/sims-back
 
 # Se crea automáticamente al deplegar si está configurado en .env
@@ -159,25 +159,25 @@ docker-compose exec api php artisan db:seed --class=SuperAdminSeeder --force
 
 ```bash
 # 1. Obtén token SuperAdmin
-curl -X POST http://178.62.229.151:8000/api/v1/superadmin/auth/login \
+curl -X POST http://YOUR_SERVER_IP:8000/api/v1/superadmin/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"superadmin@example.com","password":"change_this_superadmin_password"}'
 
 # Guardar el token de la respuesta como $TOKEN
 
 # 2. Crear tenant
-curl -X POST http://178.62.229.151:8000/api/v1/superadmin/tenants \
+curl -X POST http://YOUR_SERVER_IP:8000/api/v1/superadmin/tenants \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "id": "empresa1",
     "name": "Empresa Uno",
-    "admin_email": "admin@empresa1.simsgrup2.app",
+    "admin_email": "admin@empresa1.YOUR_DOMAIN.app",
     "admin_password": "admin1234"
   }'
 
 # 3. Respuesta incluye URL de acceso:
-# http://empresa1.simsgrup2.app/api/v1/auth/login
+# http://empresa1.YOUR_DOMAIN.app/api/v1/auth/login
 ```
 
 ---
@@ -185,7 +185,7 @@ curl -X POST http://178.62.229.151:8000/api/v1/superadmin/tenants \
 ## 8. Seeding Manual de Tenant
 
 ```bash
-ssh -i ~/.ssh/deploy_key root@178.62.229.151
+ssh -i ~/.ssh/deploy_key root@YOUR_SERVER_IP
 cd /var/www/sims-back
 
 # Si no se seedeó automáticamente
@@ -196,7 +196,7 @@ docker-compose exec api php artisan tenants:seed --tenants=empresa1
 
 ## 9. Acceder a PgAdmin
 
-**URL:** `http://178.62.229.151:5050`
+**URL:** `http://YOUR_SERVER_IP:5050`
 
 **Credenciales:**
 - Email: `pgadmin@example.com`
@@ -218,20 +218,20 @@ docker-compose exec api php artisan tenants:seed --tenants=empresa1
 
 ## 10. Configurar DNS para Tenants
 
-**En tu registrador (simsgrup2.app):**
+**En tu registrador (YOUR_DOMAIN.app):**
 
 Crea un registro DNS wildcard:
 ```
 Name: *.
 Type: A
-Value: 178.62.229.151
+Value: YOUR_SERVER_IP
 ```
 
 O específico por tenant:
 ```
 Name: empresa1
 Type: A
-Value: 178.62.229.151
+Value: YOUR_SERVER_IP
 ```
 
 ---
@@ -239,10 +239,10 @@ Value: 178.62.229.151
 ## 11. SSL Certificates para Tenants
 
 ```bash
-ssh -i ~/.ssh/deploy_key root@178.62.229.151
+ssh -i ~/.ssh/deploy_key root@YOUR_SERVER_IP
 
-# Generar certificate para un tenant
-sudo certbot --nginx -d empresa1.simsgrup2.app --non-interactive --agree-tos -m tu@email.com
+# Generar certificado para un tenant
+sudo certbot --nginx -d empresa1.YOUR_DOMAIN.app --non-interactive --agree-tos -m tu@email.com
 ```
 
 **Se renueva automáticamente** (certbot cron job).
@@ -252,7 +252,7 @@ sudo certbot --nginx -d empresa1.simsgrup2.app --non-interactive --agree-tos -m 
 ## 12. Logs y Debuggeo
 
 ```bash
-ssh -i ~/.ssh/deploy_key root@178.62.229.151
+ssh -i ~/.ssh/deploy_key root@YOUR_SERVER_IP
 cd /var/www/sims-back
 
 # Logs de Docker (tiempo real)
@@ -325,7 +325,7 @@ El workflow hace todo automáticamente:
 Si necesitas restaurar la BD completa:
 
 ```bash
-ssh -i ~/.ssh/deploy_key root@178.62.229.151
+ssh -i ~/.ssh/deploy_key root@YOUR_SERVER_IP
 cd /var/www/sims-back
 
 # Hacer backup
@@ -341,11 +341,11 @@ docker-compose exec -T postgres psql -U sims_user sims < backup.sql
 
 | Acción | Comando |
 |--------|---------|
-| SSH DigitalOcean | `ssh -i ~/.ssh/deploy_key root@178.62.229.151` |
+| SSH DigitalOcean | `ssh -i ~/.ssh/deploy_key root@YOUR_SERVER_IP` |
 | Ver logs | `docker-compose logs -f api` |
 | Crear tenant | POST `/api/v1/superadmin/tenants` con token |
 | Seed tenant | `docker-compose exec api php artisan tenants:seed --tenants=empresa1` |
-| Acceder PgAdmin | `http://178.62.229.151:5050` |
+| Acceder PgAdmin | `http://YOUR_SERVER_IP:5050` |
 | Deploy | `git push origin main` (automático) |
 
 ---
