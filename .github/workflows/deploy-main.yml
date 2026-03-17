@@ -122,7 +122,7 @@ jobs:
           SSH_HOST: ${{ secrets.DEPLOY_HOST }}
         run: |
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" \
-            "cd /var/www/sims-back && sleep 10 && for i in $(seq 1 5); do docker-compose exec -T api php artisan migrate --force && break || sleep 5; done"
+            "cd /var/www/sims-back && sleep 10 && for i in \$(seq 1 5); do docker-compose exec -T api php artisan migrate --force && break || sleep 5; done"
 
       - name: Restart containers
         env:
