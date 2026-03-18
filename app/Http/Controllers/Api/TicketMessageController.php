@@ -9,12 +9,38 @@ use Illuminate\Http\Request;
 
 class TicketMessageController extends Controller
 {
+    private function isAdmin(Request $request): bool
+    {
+        $user = $request->user();
+
+        return (bool) ($user?->hasRole('Admin') || strtolower((string) ($user?->role ?? '')) === 'admin');
+    }
+
+    private function assertCanAccessTicket(Request $request, Ticket $ticket)
+    {
+        $user = $request->user();
+
+        if (! $user) {
+            return response()->json(['message' => 'Unauthenticated.'], 401);
+        }
+
+        if (! $this->isAdmin($request) && (string) $ticket->user_id !== (string) $user->user_id) {
+            return response()->json(['message' => 'Forbidden.'], 403);
+        }
+
+        return null;
+    }
+
     /**
      * GET /v1/tickets/{ticket}/messages
      * Returns the ticket message history with user name and is_admin status.
      */
     public function index(Request $request, Ticket $ticket)
     {
+        if ($deny = $this->assertCanAccessTicket($request, $ticket)) {
+            return $deny;
+        }
+
         $perPage = (int) $request->query('per_page', 20);
         $perPage = max(1, min(100, $perPage));
 
@@ -44,10 +70,11 @@ class TicketMessageController extends Controller
      */
     public function store(Request $request, Ticket $ticket)
     {
-        $user = $request->user();
-        if (!$user) {
-            return response()->json(['message' => 'Unauthorized'], 401);
+        if ($deny = $this->assertCanAccessTicket($request, $ticket)) {
+            return $deny;
         }
+
+        $user = $request->user();
 
         $validated = $request->validate([
             'message' => ['required', 'string', 'max:5000', 'regex:/\S/'],
@@ -57,7 +84,8 @@ class TicketMessageController extends Controller
             'ticket_id' => $ticket->getKey(),
             'sender_id' => $user->getKey(),          // always from the token
             'message'   => $validated['message'],
-            'is_admin'  => $user->role === 'admin',  // calculated from the token
+            'is_admin'  => $this->isAdmin($request),  // calculated from the token
+            'created_at' => now(),
         ]);
 
         $ticketMessage->load('user');

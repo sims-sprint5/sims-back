@@ -34,6 +34,9 @@ class TenantDatabaseSeeder extends Seeder
         $users = User::factory()->count(5)->user()->create();
         $allUsers = $users->push($admin);
 
+        // Create initial Spatie roles and assign Super Admin to the first user in this tenant.
+        $this->call(RolesAndPermissionsSeeder::class);
+
         $vehicles = Vehicle::factory()->count(8)->create();
 
         for ($i = 0; $i < 6; $i++) {

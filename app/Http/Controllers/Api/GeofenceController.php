@@ -45,9 +45,22 @@ class GeofenceController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(string $id)
+    public function show(Request $request, string $id)
     {
-        $geofence = Geofence::with(['vehicleLogs.vehicle'])->findOrFail($id);
+        $query = Geofence::query();
+
+        $includeLogs = $request->boolean('include_logs', false);
+        if ($includeLogs) {
+            $user = $request->user();
+
+            if (! $user || ! $user->hasRole('Admin')) {
+                return response()->json(['message' => 'Forbidden.'], 403);
+            }
+
+            $query->with(['vehicleLogs.vehicle']);
+        }
+
+        $geofence = $query->findOrFail($id);
 
         return response()->json($geofence);
     }

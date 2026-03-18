@@ -23,11 +23,19 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->priority([
             \Stancl\Tenancy\Middleware\InitializeTenancyBySubdomain::class,
             \Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains::class,
+            \Illuminate\Routing\Middleware\SubstituteBindings::class,
         ]);
 
         $middleware->alias([
+            // Override default auth redirect behavior for API (avoid Route [login] not defined)
+            'auth' => \App\Http\Middleware\Authenticate::class,
             'ensure.superadmin' => \App\Http\Middleware\EnsureSuperAdmin::class,
             'ensure.tenant' => \App\Http\Middleware\EnsureTenantUser::class,
+
+            // Spatie Laravel Permission
+            'role' => \Spatie\Permission\Middleware\RoleMiddleware::class,
+            'permission' => \Spatie\Permission\Middleware\PermissionMiddleware::class,
+            'role_or_permission' => \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

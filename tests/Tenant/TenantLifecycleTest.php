@@ -127,6 +127,110 @@ class TenantLifecycleTest extends TestCase
             ->assertJsonStructure(['data' => ['access_token', 'user']]);
     }
 
+    /** The authenticated tenant user can update their own name. */
+    public function test_tenant_user_can_update_own_name(): void
+    {
+        // First create the tenant.
+        $this->withToken($this->superadminToken)
+            ->postJson('/api/v1/superadmin/tenants', [
+                'id' => $this->tenantId,
+                'name' => 'CI Test Company',
+                'admin_email' => $this->adminEmail,
+                'admin_password' => $this->adminPassword,
+            ])
+            ->assertStatus(201);
+
+        // Then log in as the tenant admin via the tenant subdomain.
+        $token = $this->postJson("http://{$this->tenantId}.lvh.me/api/v1/auth/login", [
+            'email' => $this->adminEmail,
+            'password' => $this->adminPassword,
+        ])
+            ->assertStatus(200)
+            ->json('data.access_token');
+
+        $newName = 'Nuevo Nombre';
+
+        $this->withToken($token)
+            ->patchJson("http://{$this->tenantId}.lvh.me/api/v1/auth/me", [
+                'name' => $newName,
+            ])
+            ->assertStatus(200)
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.name', $newName);
+    }
+
+    /** A normal tenant user can view geofences for map rendering (read-only). */
+    public function test_tenant_user_can_view_geofences(): void
+    {
+        // Create the tenant.
+        $this->withToken($this->superadminToken)
+            ->postJson('/api/v1/superadmin/tenants', [
+                'id' => $this->tenantId,
+                'name' => 'CI Test Company',
+                'admin_email' => $this->adminEmail,
+                'admin_password' => $this->adminPassword,
+            ])
+            ->assertStatus(201);
+
+        // Login as tenant admin to create a geofence.
+        $adminToken = $this->postJson("http://{$this->tenantId}.lvh.me/api/v1/auth/login", [
+            'email' => $this->adminEmail,
+            'password' => $this->adminPassword,
+        ])
+            ->assertStatus(200)
+            ->json('data.access_token');
+
+        $geofenceResponse = $this->withToken($adminToken)
+            ->postJson("http://{$this->tenantId}.lvh.me/api/v1/geofences", [
+                'name' => 'Zona 1',
+                'description' => 'Zona de prueba',
+                'type' => 'restricted',
+                'center_latitude' => 40.4168,
+                'center_longitude' => -3.7038,
+                'radius' => 150,
+                'status' => 'active',
+            ]);
+
+        $geofenceResponse->assertStatus(201);
+        $geofenceId = (string) $geofenceResponse->json('geofence_id');
+
+        // Register + login as a normal user.
+        $userEmail = "user@{$this->tenantId}.lvh.me";
+        $userPassword = 'Test1234!';
+
+        $this->postJson("http://{$this->tenantId}.lvh.me/api/v1/auth/register", [
+            'name' => 'Usuario Normal',
+            'email' => $userEmail,
+            'password' => $userPassword,
+            'password_confirmation' => $userPassword,
+        ])
+            ->assertStatus(201);
+
+        $userToken = $this->postJson("http://{$this->tenantId}.lvh.me/api/v1/auth/login", [
+            'email' => $userEmail,
+            'password' => $userPassword,
+        ])
+            ->assertStatus(200)
+            ->json('data.access_token');
+
+        // User can list geofences.
+        $this->withToken($userToken)
+            ->getJson("http://{$this->tenantId}.lvh.me/api/v1/geofences")
+            ->assertStatus(200)
+            ->assertJsonFragment(['name' => 'Zona 1']);
+
+        // User can view a geofence.
+        $this->withToken($userToken)
+            ->getJson("http://{$this->tenantId}.lvh.me/api/v1/geofences/{$geofenceId}")
+            ->assertStatus(200)
+            ->assertJsonPath('name', 'Zona 1');
+
+        // User cannot include logs.
+        $this->withToken($userToken)
+            ->getJson("http://{$this->tenantId}.lvh.me/api/v1/geofences/{$geofenceId}?include_logs=1")
+            ->assertStatus(403);
+    }
+
     /** A SuperAdmin token must be rejected on tenant routes (and vice-versa). */
     public function test_superadmin_token_denied_on_tenant_routes(): void
     {
@@ -144,6 +248,90 @@ class TenantLifecycleTest extends TestCase
             ->getJson("http://{$this->tenantId}.lvh.me/api/v1/auth/me");
 
         $response->assertStatus(401);
+    }
+
+    /** A tenant user can send and list ticket messages; other users are forbidden. */
+    public function test_tenant_user_can_send_and_list_ticket_messages(): void
+    {
+        // Create the tenant.
+        $this->withToken($this->superadminToken)
+            ->postJson('/api/v1/superadmin/tenants', [
+                'id' => $this->tenantId,
+                'name' => 'CI Test Company',
+                'admin_email' => $this->adminEmail,
+                'admin_password' => $this->adminPassword,
+            ])
+            ->assertStatus(201);
+
+        // Register + login as a normal user.
+        $userEmail = "user1@{$this->tenantId}.lvh.me";
+        $userPassword = 'Test1234!';
+
+        $this->postJson("http://{$this->tenantId}.lvh.me/api/v1/auth/register", [
+            'name' => 'Usuario Normal 1',
+            'email' => $userEmail,
+            'password' => $userPassword,
+            'password_confirmation' => $userPassword,
+        ])
+            ->assertStatus(201);
+
+        $userToken = $this->postJson("http://{$this->tenantId}.lvh.me/api/v1/auth/login", [
+            'email' => $userEmail,
+            'password' => $userPassword,
+        ])
+            ->assertStatus(200)
+            ->json('data.access_token');
+
+        // Create a ticket as this user.
+        $ticketResponse = $this->withToken($userToken)
+            ->postJson("http://{$this->tenantId}.lvh.me/api/v1/tickets", [
+                'type' => 'technical',
+                'subject' => 'No funciona',
+                'description' => 'Detalle del problema',
+                'priority' => 'medium',
+            ]);
+
+        $ticketResponse->assertStatus(201);
+        $ticketId = (string) $ticketResponse->json('ticket_id');
+        $this->assertNotEmpty($ticketId);
+
+        // Send a message.
+        $messageText = 'Hola soporte, tengo una duda.';
+
+        $this->withToken($userToken)
+            ->postJson("http://{$this->tenantId}.lvh.me/api/v1/tickets/{$ticketId}/messages", [
+                'message' => $messageText,
+            ])
+            ->assertStatus(201)
+            ->assertJsonFragment(['message' => $messageText]);
+
+        // List messages should include it.
+        $this->withToken($userToken)
+            ->getJson("http://{$this->tenantId}.lvh.me/api/v1/tickets/{$ticketId}/messages")
+            ->assertStatus(200)
+            ->assertJsonFragment(['message' => $messageText]);
+
+        // Another user must not see messages for this ticket.
+        $userEmail2 = "user2@{$this->tenantId}.lvh.me";
+
+        $this->postJson("http://{$this->tenantId}.lvh.me/api/v1/auth/register", [
+            'name' => 'Usuario Normal 2',
+            'email' => $userEmail2,
+            'password' => $userPassword,
+            'password_confirmation' => $userPassword,
+        ])
+            ->assertStatus(201);
+
+        $userToken2 = $this->postJson("http://{$this->tenantId}.lvh.me/api/v1/auth/login", [
+            'email' => $userEmail2,
+            'password' => $userPassword,
+        ])
+            ->assertStatus(200)
+            ->json('data.access_token');
+
+        $this->withToken($userToken2)
+            ->getJson("http://{$this->tenantId}.lvh.me/api/v1/tickets/{$ticketId}/messages")
+            ->assertStatus(403);
     }
 
     /** Deleting a tenant must remove it from the central DB. */

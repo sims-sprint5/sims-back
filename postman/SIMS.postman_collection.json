@@ -1,0 +1,417 @@
+{
+  "info": {
+    "name": "SIMS API (v1) — Roles & Permissions",
+    "_postman_id": "8e5f6f75-97ab-4c39-9f6a-5dd2f1d67a9e",
+    "description": "Collection to validate SuperAdmin (central) vs Tenant (Admin/Usuario) permissions.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "exec": [
+          "// One-file setup: ensure required base URLs exist.",
+          "if (!pm.collectionVariables.get('centralBaseUrl')) { pm.collectionVariables.set('centralBaseUrl', 'http://localhost:8000/api/v1'); }",
+          "if (!pm.collectionVariables.get('tenantBaseUrl')) { pm.collectionVariables.set('tenantBaseUrl', 'http://empresa1.lvh.me:8000/api/v1'); }",
+          "if (!pm.collectionVariables.get('tenantName')) { pm.collectionVariables.set('tenantName', 'Empresa Test'); }",
+          "if (!pm.collectionVariables.get('tenantId')) { pm.collectionVariables.set('tenantId', 'empresa1'); }",
+          "if (!pm.collectionVariables.get('tenantAdminPassword')) { pm.collectionVariables.set('tenantAdminPassword', 'Test1234!'); }",
+          "if (!pm.collectionVariables.get('tenantUserPassword')) { pm.collectionVariables.set('tenantUserPassword', 'User1234!'); }",
+          "if (!pm.collectionVariables.get('vehicleId')) { pm.collectionVariables.set('vehicleId', '1'); }"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    { "key": "centralBaseUrl", "value": "http://localhost:8000/api/v1", "type": "string" },
+    { "key": "tenantBaseUrl", "value": "http://empresa1.lvh.me:8000/api/v1", "type": "string" },
+    { "key": "tenantId", "value": "empresa1", "type": "string" },
+    { "key": "tenantName", "value": "Empresa Test", "type": "string" },
+
+    { "key": "superadminEmail", "value": "superadmin@sims.com", "type": "string" },
+    { "key": "superadminPassword", "value": "ikeradmin2026", "type": "string" },
+    { "key": "superadminToken", "value": "", "type": "string" },
+
+    { "key": "tenantAdminEmail", "value": "admin@empresa1.lvh.me", "type": "string" },
+    { "key": "tenantAdminPassword", "value": "Test1234!", "type": "string" },
+    { "key": "tenantAdminToken", "value": "", "type": "string" },
+
+    { "key": "tenantUserEmail", "value": "", "type": "string" },
+    { "key": "tenantUserPassword", "value": "User1234!", "type": "string" },
+    { "key": "tenantUserToken", "value": "", "type": "string" },
+
+    { "key": "runSuffix", "value": "", "type": "string" },
+    { "key": "vehicleId", "value": "1", "type": "string" },
+    { "key": "reservationId", "value": "", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "Central — SuperAdmin",
+      "item": [
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 200', function () { pm.response.to.have.status(200); });",
+                  "var json = pm.response.json();",
+                  "if (json && json.token) { pm.collectionVariables.set('superadminToken', json.token); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{superadminEmail}}\",\n  \"password\": \"{{superadminPassword}}\"\n}"
+            },
+            "url": "{{centralBaseUrl}}/superadmin/auth/login"
+          }
+        },
+        {
+          "name": "Me",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{superadminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "url": "{{centralBaseUrl}}/superadmin/auth/me"
+          }
+        },
+        {
+          "name": "Create tenant",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 201', function () { pm.response.to.have.status(201); });",
+                  "var json = pm.response.json();",
+                  "if (json && json.tenant && json.tenant.id) { pm.collectionVariables.set('tenantId', json.tenant.id); }",
+                  "if (json && json.access && json.access.admin_email) { pm.collectionVariables.set('tenantAdminEmail', json.access.admin_email); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{superadminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{tenantId}}\",\n  \"name\": \"{{tenantName}}\",\n  \"admin_email\": \"{{tenantAdminEmail}}\",\n  \"admin_password\": \"{{tenantAdminPassword}}\"\n}"
+            },
+            "url": "{{centralBaseUrl}}/superadmin/tenants"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Tenant — Auth",
+      "item": [
+        {
+          "name": "Register normal user",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Generate a unique email per run to avoid collisions",
+                  "var suffix = pm.collectionVariables.get('runSuffix');",
+                  "if (!suffix) { suffix = (Date.now()).toString(); pm.collectionVariables.set('runSuffix', suffix); }",
+                  "pm.collectionVariables.set('tenantUserEmail', 'user.' + suffix + '@example.test');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Normal User\",\n  \"email\": \"{{tenantUserEmail}}\",\n  \"password\": \"{{tenantUserPassword}}\",\n  \"password_confirmation\": \"{{tenantUserPassword}}\"\n}"
+            },
+            "url": "{{tenantBaseUrl}}/auth/register"
+          }
+        },
+        {
+          "name": "Login normal user",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 200', function () { pm.response.to.have.status(200); });",
+                  "var json = pm.response.json();",
+                  "if (json && json.data && json.data.access_token) { pm.collectionVariables.set('tenantUserToken', json.data.access_token); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{tenantUserEmail}}\",\n  \"password\": \"{{tenantUserPassword}}\"\n}"
+            },
+            "url": "{{tenantBaseUrl}}/auth/login"
+          }
+        },
+        {
+          "name": "Login tenant admin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 200', function () { pm.response.to.have.status(200); });",
+                  "var json = pm.response.json();",
+                  "if (json && json.data && json.data.access_token) { pm.collectionVariables.set('tenantAdminToken', json.data.access_token); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{tenantAdminEmail}}\",\n  \"password\": \"{{tenantAdminPassword}}\"\n}"
+            },
+            "url": "{{tenantBaseUrl}}/auth/login"
+          }
+        },
+        {
+          "name": "Me (normal user)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tenantUserToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "url": "{{tenantBaseUrl}}/auth/me"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Tenant — Permission checks (Usuario vs Admin)",
+      "item": [
+        {
+          "name": "Vehicles list (Usuario) — should be 200",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tenantUserToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "url": "{{tenantBaseUrl}}/vehicles"
+          }
+        },
+        {
+          "name": "Users index (Usuario) — should be 403",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tenantUserToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "url": "{{tenantBaseUrl}}/users"
+          }
+        },
+        {
+          "name": "Users index (Admin) — should be 200",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tenantAdminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "url": "{{tenantBaseUrl}}/users"
+          }
+        },
+        {
+          "name": "Create reservation (Usuario) — stores reservationId",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 201', function () { pm.response.to.have.status(201); });",
+                  "var json = pm.response.json();",
+                  "// Reservation model uses reservation_id as PK; keep fallback for id",
+                  "pm.collectionVariables.set('reservationId', (json && (json.reservation_id || json.id)) ? (json.reservation_id || json.id) : pm.collectionVariables.get('reservationId'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tenantUserToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"vehicle_id\": {{vehicleId}},\n  \"start_date\": \"2026-03-20\",\n  \"end_date\": \"2026-03-21\"\n}"
+            },
+            "url": "{{tenantBaseUrl}}/reservations"
+          }
+        },
+        {
+          "name": "My reservations (Usuario) — should be 200",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tenantUserToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "url": "{{tenantBaseUrl}}/reservations"
+          }
+        },
+        {
+          "name": "Reservation status update (Usuario) — should be 403 (Admin-only route)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tenantUserToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"active\"\n}"
+            },
+            "url": "{{tenantBaseUrl}}/reservations/{{reservationId}}/status"
+          }
+        },
+        {
+          "name": "Reservation status update (Admin) — should be 200",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tenantAdminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"active\"\n}"
+            },
+            "url": "{{tenantBaseUrl}}/reservations/{{reservationId}}/status"
+          }
+        }
+      ]
+    }
+  ]
+}

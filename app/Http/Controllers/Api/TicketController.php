@@ -8,13 +8,26 @@ use Illuminate\Http\Request;
 
 class TicketController extends Controller
 {
+    private function isAdmin(Request $request): bool
+    {
+        $user = $request->user();
+
+        return (bool) ($user?->hasRole('Admin') || strtolower((string) ($user?->role ?? '')) === 'admin');
+    }
+
     /**
      * Display a listing of the resource.
      */
     public function index(Request $request)
     {
         $perPage = $request->integer('per_page', 15);
-        $tickets = Ticket::with(['user', 'vehicle', 'reservation', 'assignedUser'])->paginate($perPage);
+        $query = Ticket::query()->with(['user', 'vehicle', 'reservation', 'assignedUser']);
+
+        if (! $this->isAdmin($request)) {
+            $query->where('user_id', $request->user()->user_id);
+        }
+
+        $tickets = $query->paginate($perPage);
 
         return response()->json($tickets);
     }
@@ -25,7 +38,7 @@ class TicketController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'user_id' => 'required|exists:users,user_id',
+            'user_id' => 'nullable|exists:users,user_id',
             'vehicle_id' => 'nullable|exists:vehicles,vehicle_id',
             'reservation_id' => 'nullable|exists:reservations,reservation_id',
             'type' => 'required|string|in:technical,billing,complaint,inquiry',
@@ -35,6 +48,15 @@ class TicketController extends Controller
             'status' => 'nullable|string|in:open,in_progress,resolved,closed',
             'assigned_to' => 'nullable|exists:users,user_id',
         ]);
+
+        if (! $this->isAdmin($request)) {
+            $validated['user_id'] = $request->user()->user_id;
+            unset($validated['assigned_to'], $validated['status']);
+        } else {
+            if (empty($validated['user_id'])) {
+                return response()->json(['message' => 'user_id is required for admin.'], 422);
+            }
+        }
 
         $ticket = Ticket::create($validated);
 
@@ -47,6 +69,14 @@ class TicketController extends Controller
     public function show(string $id)
     {
         $ticket = Ticket::with(['user', 'vehicle', 'reservation', 'assignedUser'])->findOrFail($id);
+
+        if (! request()->user()) {
+            return response()->json(['message' => 'Unauthenticated.'], 401);
+        }
+
+        if (! $this->isAdmin(request()) && $ticket->user_id !== request()->user()->user_id) {
+            return response()->json(['message' => 'Forbidden.'], 403);
+        }
 
         return response()->json($ticket);
     }
@@ -91,6 +121,16 @@ class TicketController extends Controller
      */
     public function byUser(string $userId)
     {
+        $request = request();
+
+        if (! $request->user()) {
+            return response()->json(['message' => 'Unauthenticated.'], 401);
+        }
+
+        if (! $this->isAdmin($request) && (string) $request->user()->user_id !== (string) $userId) {
+            return response()->json(['message' => 'Forbidden.'], 403);
+        }
+
         $tickets = Ticket::where('user_id', $userId)
             ->with(['vehicle', 'reservation', 'assignedUser'])
             ->get();
