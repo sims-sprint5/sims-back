@@ -6,10 +6,33 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
+use Spatie\Permission\Models\Role;
 
 class AuthController extends Controller
 {
+    private function ensureSpatieRole(User $user): void
+    {
+        if (! Schema::hasTable('roles') || ! Schema::hasTable('model_has_roles')) {
+            return;
+        }
+
+        if ($user->roles()->exists()) {
+            return;
+        }
+
+        // Spatie roles for tenant Users are stored under the 'web' guard.
+        // This must not depend on auth.defaults.guard.
+        $guardName = 'web';
+        $legacyRole = strtolower((string) ($user->role ?? ''));
+
+        $roleName = $legacyRole === 'admin' ? 'Admin' : 'Usuario';
+
+        $role = Role::findOrCreate($roleName, $guardName);
+        $user->assignRole($role);
+    }
+
     /**
      * Register a new user.
      */
@@ -28,9 +51,14 @@ class AuthController extends Controller
             'email' => $validated['email'],
             'password' => Hash::make($validated['password']),
             'phone' => $validated['phone'] ?? null,
-            'role' => $validated['role'] ?? 'user',
+            // Public registration is for normal users only.
+            // Keep accepting the input field for backward compatibility, but ignore it.
+            'role' => 'user',
             'status' => 'active',
         ]);
+
+        // Backfill/assign Spatie role based on the existing legacy role field.
+        $this->ensureSpatieRole($user);
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
@@ -76,6 +104,10 @@ class AuthController extends Controller
                 'message' => 'Account is inactive. Please contact your administrator.',
             ], 403);
         }
+
+        // Ensure the user has a Spatie role before issuing a token.
+        // This prevents unexpected 403 when routes are protected by role middleware.
+        $this->ensureSpatieRole($user);
 
         // Revoke all previous tokens before issuing a new one.
         $user->tokens()->delete();
@@ -123,6 +155,35 @@ class AuthController extends Controller
 
         return response()->json([
             'success' => true,
+            'data' => [
+                'user_id' => $user->user_id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'role' => $user->role,
+                'phone' => $user->phone,
+                'status' => $user->status,
+            ],
+        ]);
+    }
+
+    /**
+     * Update the authenticated user's profile (currently only name).
+     */
+    public function updateMe(Request $request)
+    {
+        $validated = $request->validate([
+            // DB column is name(100); treated as username/display name.
+            'name' => 'required|string|min:2|max:100',
+        ]);
+
+        $user = $request->user();
+        $user->forceFill([
+            'name' => $validated['name'],
+        ])->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'User name updated successfully',
             'data' => [
                 'user_id' => $user->user_id,
                 'name' => $user->name,

@@ -6,10 +6,32 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
+use Spatie\Permission\Models\Role;
 
 class UserController extends Controller
 {
+    private function ensureSpatieRole(User $user): void
+    {
+        if (! Schema::hasTable('roles') || ! Schema::hasTable('model_has_roles')) {
+            return;
+        }
+
+        // Spatie roles for tenant Users are stored under the 'web' guard.
+        // This must not depend on auth.defaults.guard.
+        $guardName = 'web';
+        $legacyRole = strtolower((string) ($user->role ?? ''));
+
+        $roleName = $legacyRole === 'admin' ? 'Admin' : 'Usuario';
+        $role = Role::findOrCreate($roleName, $guardName);
+
+        // Don't override manual role assignments.
+        if (! $user->roles()->exists()) {
+            $user->assignRole($role);
+        }
+    }
+
     /**
      * Display a listing of the resource.
      */
@@ -38,6 +60,8 @@ class UserController extends Controller
         $validated['password'] = Hash::make($validated['password']);
 
         $user = User::create($validated);
+
+        $this->ensureSpatieRole($user);
 
         return response()->json($user, 201);
     }
@@ -83,6 +107,16 @@ class UserController extends Controller
     public function destroy(string $id)
     {
         $user = User::findOrFail($id);
+
+        $actor = request()->user();
+
+        // Admin cannot delete other admins/super admins.
+        if ($actor && ($actor->hasRole('Admin') || strtolower((string) ($actor->role ?? '')) === 'admin')) {
+            if ($user->hasRole('Admin') || $user->hasRole('Super Admin') || strtolower((string) ($user->role ?? '')) === 'admin') {
+                return response()->json(['message' => 'Forbidden.'], 403);
+            }
+        }
+
         $user->delete();
 
         return response()->json(['message' => 'User deleted successfully'], 200);
