@@ -59,10 +59,9 @@
                 <div class="hidden md:flex space-x-8">
                     <a href="#funcionalitats" class="text-sm font-medium text-slate-600 hover:text-primary-600 transition-colors">Funcionalitats</a>
                     <a href="#beneficis" class="text-sm font-medium text-slate-600 hover:text-primary-600 transition-colors">Beneficis</a>
-                    <a href="http://localhost:3000/login" class="text-sm font-medium text-slate-600 hover:text-primary-600 transition-colors">Contactan's</a>
                 </div>
                 <div class="flex items-center">
-                    <a href="http://localhost:3000/register" class="text-sm font-semibold bg-primary-600 text-white px-5 py-2.5 rounded-full hover:bg-primary-700 hover:shadow-lg hover:shadow-primary-500/30 transition-all shadow-md transform hover:-translate-y-0.5">Nova Empresa</a>
+                    <a href="#contacte" class="text-sm font-semibold bg-primary-600 text-white px-5 py-2.5 rounded-full hover:bg-primary-700 hover:shadow-lg hover:shadow-primary-500/30 transition-all shadow-md transform hover:-translate-y-0.5">Contacta'ns</a>
                 </div>
             </div>
         </div>
@@ -91,7 +90,7 @@
                 El software que permet gestionar i monitoritzar vehicles en temps real. Amigable, multdispositiu i pensat per estalviar-te temps i diners.
             </p>
             <div class="flex flex-col sm:flex-row justify-center gap-4 mb-16">
-                <a href="http://localhost:3000/register" class="bg-slate-900 hover:bg-slate-800 text-white font-semibold text-lg px-8 py-4 rounded-full shadow-xl hover:shadow-2xl transition-all transform hover:-translate-y-1">Contactan's</a>
+                <a href="#contacte" class="bg-slate-900 hover:bg-slate-800 text-white font-semibold text-lg px-8 py-4 rounded-full shadow-xl hover:shadow-2xl transition-all transform hover:-translate-y-1">Contacta'ns</a>
                 <a href="#funcionalitats" class="bg-white hover:bg-slate-50 text-slate-700 font-semibold text-lg px-8 py-4 rounded-full border border-slate-200 shadow-sm hover:shadow-md transition-all">Explora SIMS</a>
             </div>
             
@@ -235,13 +234,36 @@
         </div>
     </section>
 
-    <!-- CTA Section -->
-    <section class="py-24 bg-gradient-to-br from-primary-600 to-secondary-600 text-center relative overflow-hidden">
+    <!-- Contact Section -->
+    <section id="contacte" class="py-24 bg-gradient-to-br from-primary-600 to-secondary-600 text-center relative overflow-hidden">
         <div class="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'%23ffffff\' fill-opacity=\'0.1\'%3E%3Cpath d=\'M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E')] opacity-30"></div>
         <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 observe-me animate-on-scroll">
-            <h2 class="text-4xl md:text-5xl font-extrabold text-white mb-6">Llest per revolucionar la teva flota?</h2>
-            <p class="text-xl text-primary-100 mb-10 w-3/4 mx-auto">Uneix-te al programari que optimitza els recursos i revoluciona la teva gestió.</p>
-            <a href="http://localhost:3000/register" class="inline-block bg-white text-primary-600 font-bold text-xl px-10 py-5 rounded-full shadow-2xl hover:bg-slate-50 transition-all transform hover:scale-105">Contactan's</a>
+            <h2 class="text-4xl md:text-5xl font-extrabold text-white mb-6">Parlem per millorar la teva flota?</h2>
+            <p class="text-xl text-primary-100 mb-12 w-3/4 mx-auto">Tens dubtes sobre com SIMS pot ser d'ajuda? Contacta amb el nostre equip d'experts i t'assessorarem sense cap compromís.</p>
+            
+            <div class="flex flex-col md:flex-row justify-center gap-8 items-center bg-white/10 backdrop-blur-md rounded-3xl p-8 border border-white/20 shadow-2xl max-w-3xl mx-auto">
+                <div class="flex items-center gap-4 text-white hover:text-primary-100 transition-colors cursor-pointer group">
+                    <div class="w-14 h-14 rounded-full bg-white/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                    </div>
+                    <div class="text-left">
+                        <div class="text-sm text-primary-200">Envia'ns un correu</div>
+                        <a href="mailto:info@sims.com" class="text-xl font-bold">info@simsequip.com</a>
+                    </div>
+                </div>
+                
+                <div class="w-px h-16 bg-white/20 hidden md:block"></div>
+                
+                <div class="flex items-center gap-4 text-white hover:text-primary-100 transition-colors cursor-pointer group">
+                    <div class="w-14 h-14 rounded-full bg-white/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+                    </div>
+                    <div class="text-left">
+                        <div class="text-sm text-primary-200">Truca'ns ara</div>
+                        <a href="tel:+34900123456" class="text-xl font-bold">+34 900 123 456</a>
+                    </div>
+                </div>
+            </div>
         </div>
     </section>
 
