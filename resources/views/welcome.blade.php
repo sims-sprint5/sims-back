@@ -90,9 +90,14 @@
             <p class="mt-4 text-xl text-slate-600 max-w-2xl mx-auto mb-10 leading-relaxed">
                 El software que permet gestionar i monitoritzar vehicles en temps real. Amigable, multdispositiu i pensat per estalviar-te temps i diners.
             </p>
-            <div class="flex flex-col sm:flex-row justify-center gap-4">
+            <div class="flex flex-col sm:flex-row justify-center gap-4 mb-16">
                 <a href="http://localhost:3000/register" class="bg-slate-900 hover:bg-slate-800 text-white font-semibold text-lg px-8 py-4 rounded-full shadow-xl hover:shadow-2xl transition-all transform hover:-translate-y-1">Contactan's</a>
                 <a href="#funcionalitats" class="bg-white hover:bg-slate-50 text-slate-700 font-semibold text-lg px-8 py-4 rounded-full border border-slate-200 shadow-sm hover:shadow-md transition-all">Explora SIMS</a>
+            </div>
+            
+            <!-- Video Container -->
+            <div class="mt-8 md:mt-16 mx-auto max-w-5xl rounded-2xl md:rounded-[2rem] overflow-hidden shadow-2xl border border-white/60 bg-slate-900 aspect-video relative isolate transition-all duration-500 transform-gpu hover:shadow-primary-500/30 hover:-translate-y-2">
+                <iframe class="w-full h-full absolute inset-0 z-10" src="https://www.youtube.com/embed/v86AIcOiBMQ" title="SIMS Video" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
             </div>
         </div>
     </section>
@@ -239,24 +244,6 @@
             <a href="http://localhost:3000/register" class="inline-block bg-white text-primary-600 font-bold text-xl px-10 py-5 rounded-full shadow-2xl hover:bg-slate-50 transition-all transform hover:scale-105">Contactan's</a>
         </div>
     </section>
-
-    <!-- Footer -->
-    <footer class="bg-slate-900 text-slate-400 py-12 border-t border-slate-800">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-6">
-            <div class="flex items-center gap-2">
-                <div class="w-8 h-8 rounded shrink-0 bg-primary-600 flex items-center justify-center text-white font-bold text-sm">S</div>
-                <span class="font-bold text-xl text-white">SIMS</span>
-            </div>
-            <div class="flex space-x-6 text-sm">
-                <a href="#" class="hover:text-white transition-colors">Contacte</a>
-                <a href="#" class="hover:text-white transition-colors">Privacitat</a>
-                <a href="#" class="hover:text-white transition-colors">Termes d'ús</a>
-            </div>
-            <div class="text-sm">
-                &copy; {{ date('Y') }} SIMS. Tots els drets reservats.
-            </div>
-        </div>
-    </footer>
 
     <!-- Script for scroll animation -->
     <script>
