@@ -39,7 +39,7 @@ class TenantController extends Controller
         }
 
         $request->validate([
-            'id' => 'required|string|alpha_dash|unique:tenants,id|max:50',
+            'id' => 'required|string|alpha_dash|max:50',
             'name' => 'required|string|max:255',
             'admin_name' => 'nullable|string|max:255',
             'admin_email' => 'nullable|email|max:255',
@@ -59,15 +59,28 @@ class TenantController extends Controller
 
         $adminEmail = $request->admin_email ?? "admin@{$tenantId}.{$baseDomain}";
 
-        $tenant = Tenant::create([
-            'id' => $tenantId,
-            'name' => $request->name,
-            'admin_name' => $request->admin_name ?? 'Admin '.ucfirst($tenantId),
-            'admin_email' => $adminEmail,
-            'admin_password' => $adminPassword,
-        ]);
+        $tenant = Tenant::query()->find($tenantId);
+        $isExistingTenant = (bool) $tenant;
+
+        if (! $tenant) {
+            $tenant = Tenant::create([
+                'id' => $tenantId,
+                'name' => $request->name,
+                'admin_name' => $request->admin_name ?? 'Admin '.ucfirst($tenantId),
+                'admin_email' => $adminEmail,
+                'admin_password' => $adminPassword,
+            ]);
+        } else {
+            $tenant->update([
+                'name' => $request->name,
+                'admin_name' => $request->admin_name ?? ($tenant->admin_name ?? 'Admin '.ucfirst($tenantId)),
+                'admin_email' => $adminEmail,
+                'admin_password' => $adminPassword,
+            ]);
+        }
 
         $tenant->domains()->firstOrCreate(['domain' => $tenantId]);
+        $tenant->domains()->firstOrCreate(['domain' => "{$tenantId}.{$baseDomain}"]);
 
         try {
             $this->safeLog('info', "Running tenant migrations for '{$tenantId}'...");
@@ -138,14 +151,16 @@ class TenantController extends Controller
         }
 
         return response()->json([
-            'message' => 'Tenant created successfully',
+            'message' => $isExistingTenant
+                ? 'Tenant reprovisioned successfully'
+                : 'Tenant created successfully',
             'tenant' => $tenant->load('domains'),
             'access' => [
                 'url' => "{$scheme}://{$tenantId}.{$baseDomain}{$port}",
                 'admin_email' => $adminEmail,
                 'admin_password' => $adminPassword,
             ],
-        ], 201);
+        ], $isExistingTenant ? 200 : 201);
     }
 
     public function show(string $id)

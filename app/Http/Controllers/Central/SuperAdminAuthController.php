@@ -4,8 +4,10 @@ namespace App\Http\Controllers\Central;
 
 use App\Http\Controllers\Controller;
 use App\Models\SuperAdmin;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Throwable;
 
 class SuperAdminAuthController extends Controller
 {
@@ -16,7 +18,17 @@ class SuperAdminAuthController extends Controller
             'password' => 'required|string',
         ]);
 
-        $superadmin = SuperAdmin::where('email', $request->email)->first();
+        try {
+            $superadmin = SuperAdmin::where('email', strtolower((string) $request->email))->first();
+        } catch (QueryException $e) {
+            return response()->json([
+                'message' => 'Central database is not initialized yet. Please contact support.',
+            ], 503);
+        } catch (Throwable $e) {
+            return response()->json([
+                'message' => 'Temporary authentication issue. Please try again.',
+            ], 503);
+        }
 
         if (! $superadmin || ! Hash::check($request->password, $superadmin->password)) {
             return response()->json(['message' => 'Invalid credentials'], 401);
