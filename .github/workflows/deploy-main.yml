@@ -181,7 +181,13 @@ jobs:
           SSH_HOST: ${{ secrets.DEPLOY_HOST }}
         run: |
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" \
-            "cd /var/www/sims-back && docker-compose down && docker system prune -f --all && docker-compose build && docker-compose up -d"
+            "cd /var/www/sims-back && \
+             docker-compose down --volumes --remove-orphans && \
+             docker builder prune -af && \
+             docker image prune -af && \
+             docker volume prune -f && \
+             docker-compose build --no-cache && \
+             docker-compose up -d"
 
       - name: Fix runtime permissions and APP_KEY
         env:
@@ -197,6 +203,9 @@ jobs:
              docker-compose exec -T -u root api bash -lc \"mkdir -p /var/www/html/storage/logs /var/www/html/storage/framework/{cache,sessions,views,testing} /var/www/html/bootstrap/cache && touch /var/www/html/storage/logs/laravel.log && chown -R \$APP_UID:\$APP_GID /var/www/html/storage /var/www/html/bootstrap/cache && chmod -R ug+rwX /var/www/html/storage /var/www/html/bootstrap/cache\" && \
              if ! grep -q '^APP_KEY=base64:' .env; then KEY=\$(docker-compose exec -T api php artisan key:generate --show); sed -i \"s|^APP_KEY=.*|APP_KEY=\$KEY|\" .env; fi && \
              docker-compose exec -T api php artisan optimize:clear && \
+             docker-compose exec -T api php artisan cache:clear && \
+             docker-compose exec -T api php artisan route:clear && \
+             docker-compose exec -T api php artisan view:clear && \
              docker-compose exec -T api php artisan config:cache"
 
       - name: Run Laravel migrations

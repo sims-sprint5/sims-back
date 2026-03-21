@@ -7,8 +7,12 @@ use App\Models\Tenant;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
+use RuntimeException;
+use Throwable;
 
 class TenantController extends Controller
 {
@@ -19,6 +23,21 @@ class TenantController extends Controller
 
     public function store(Request $request)
     {
+        if (! $this->isCentralSchemaReady()) {
+            return response()->json([
+                'message' => 'Central database is not initialized. Run central migrations first.',
+            ], 503);
+        }
+
+        try {
+            DB::connection()->getPdo();
+        } catch (Throwable $e) {
+            return response()->json([
+                'message' => 'Central database connection failed. Please verify DB host/credentials.',
+                'error' => $e->getMessage(),
+            ], 503);
+        }
+
         $request->validate([
             'id' => 'required|string|alpha_dash|unique:tenants,id|max:50',
             'name' => 'required|string|max:255',
@@ -27,7 +46,7 @@ class TenantController extends Controller
             'admin_password' => 'nullable|string|min:8',
         ]);
 
-        $tenantId = $request->id;
+        $tenantId = strtolower((string) $request->id);
         $baseDomain = env('TENANT_BASE_DOMAIN', 'localhost');
         $defaultTenantAdminPassword = (string) env('TENANT_DEFAULT_ADMIN_PASSWORD', 'password123');
         $adminPassword = $request->filled('admin_password')
@@ -48,28 +67,38 @@ class TenantController extends Controller
             'admin_password' => $adminPassword,
         ]);
 
-        $tenant->domains()->create(['domain' => $tenantId]);
+        $tenant->domains()->firstOrCreate(['domain' => $tenantId]);
 
         try {
             $this->safeLog('info', "Running tenant migrations for '{$tenantId}'...");
-            Artisan::call('tenants:migrate', [
+            $migrateExitCode = Artisan::call('tenants:migrate', [
                 '--tenants' => [$tenantId],
                 '--force' => true,
             ]);
             $migrateOutput = Artisan::output();
 
+            if ($migrateExitCode !== 0) {
+                throw new RuntimeException("Tenant migrate failed for '{$tenantId}'. Output: {$migrateOutput}");
+            }
+
             $this->safeLog('info', "Running tenant seeder for '{$tenantId}'...");
-            Artisan::call('tenants:seed', [
+            $seedExitCode = Artisan::call('tenants:seed', [
                 '--tenants' => [$tenantId],
                 '--force' => true,
             ]);
             $seedOutput = Artisan::output();
 
+            if ($seedExitCode !== 0) {
+                throw new RuntimeException("Tenant seed failed for '{$tenantId}'. Output: {$seedOutput}");
+            }
+
+            $this->assertTenantInitialized($tenant, $adminEmail);
+
             $this->safeLog('info', "Tenant database initialized for '{$tenantId}'", [
                 'migrate_output' => $migrateOutput,
                 'seed_output' => $seedOutput,
             ]);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             $this->safeLog('error', "Tenant bootstrap failed for '{$tenantId}': ".$e->getMessage());
             $this->safeLog('error', $e->getTraceAsString());
             $tenant->delete();
@@ -175,7 +204,29 @@ class TenantController extends Controller
     {
         try {
             Log::{$level}($message, $context);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
+        }
+    }
+
+    private function isCentralSchemaReady(): bool
+    {
+        return Schema::hasTable('tenants') && Schema::hasTable('domains');
+    }
+
+    private function assertTenantInitialized(Tenant $tenant, string $adminEmail): void
+    {
+        tenancy()->initialize($tenant);
+
+        try {
+            if (! Schema::hasTable('users')) {
+                throw new RuntimeException('Tenant users table was not created.');
+            }
+
+            if (! User::query()->where('email', $adminEmail)->exists()) {
+                throw new RuntimeException('Tenant admin user was not seeded correctly.');
+            }
+        } finally {
+            tenancy()->end();
         }
     }
 }
