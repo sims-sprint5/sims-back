@@ -29,7 +29,7 @@
     { "key": "tenantName", "value": "Empresa Test", "type": "string" },
 
     { "key": "superadminEmail", "value": "superadmin@sims.com", "type": "string" },
-    { "key": "superadminPassword", "value": "ikeradmin2026", "type": "string" },
+    { "key": "superadminPassword", "value": "", "type": "string" },
     { "key": "superadminToken", "value": "", "type": "string" },
 
     { "key": "tenantAdminEmail", "value": "admin@empresa1.lvh.me", "type": "string" },
