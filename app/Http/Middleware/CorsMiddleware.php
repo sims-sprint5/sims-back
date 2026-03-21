@@ -85,6 +85,7 @@ class CorsMiddleware
                 Log::warning('Invalid CORS origin regex pattern ignored.', [
                     'pattern' => $pattern,
                 ]);
+
                 continue;
             }
 
