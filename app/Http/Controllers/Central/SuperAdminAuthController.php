@@ -25,8 +25,17 @@ class SuperAdminAuthController extends Controller
         $token = $superadmin->createToken('superadmin-token')->plainTextToken;
 
         return response()->json([
+            'success' => true,
+            'message' => 'Login successful',
             'token' => $token,
+            'access_token' => $token,
+            'token_type' => 'Bearer',
             'superadmin' => $superadmin,
+            'data' => [
+                'superadmin' => $superadmin,
+                'access_token' => $token,
+                'token_type' => 'Bearer',
+            ],
         ]);
     }
 

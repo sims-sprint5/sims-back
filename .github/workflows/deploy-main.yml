@@ -228,6 +228,7 @@ jobs:
           '
 
           docker-compose exec -T api php artisan tenants:migrate --force
+          docker-compose exec -T api php artisan tenants:seed --class=RolesAndPermissionsSeeder --force
           EOF
 
       - name: Run Laravel seeders

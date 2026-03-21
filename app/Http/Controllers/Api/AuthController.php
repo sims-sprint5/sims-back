@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Database\QueryException;
 use Illuminate\Validation\ValidationException;
 use Spatie\Permission\Models\Role;
 
@@ -90,29 +91,44 @@ class AuthController extends Controller
             'password' => 'required',
         ]);
 
-        $user = User::where('email', $request->email)->first();
+        try {
+            $user = User::where('email', $request->email)->first();
 
-        if (! $user || ! Hash::check($request->password, $user->password)) {
-            throw ValidationException::withMessages([
-                'email' => ['The provided credentials are incorrect.'],
-            ]);
-        }
+            if (! $user || ! Hash::check($request->password, $user->password)) {
+                throw ValidationException::withMessages([
+                    'email' => ['The provided credentials are incorrect.'],
+                ]);
+            }
 
-        if ($user->status !== 'active') {
+            if ($user->status !== 'active') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Account is inactive. Please contact your administrator.',
+                ], 403);
+            }
+
+            // Ensure the user has a Spatie role before issuing a token.
+            // This prevents unexpected 403 when routes are protected by role middleware.
+            $this->ensureSpatieRole($user);
+
+            // If tenant migrations are incomplete, avoid opaque 500 and return actionable error.
+            if (! Schema::hasTable('personal_access_tokens')) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Tenant database is not initialized yet. Please contact support.',
+                ], 503);
+            }
+
+            // Revoke all previous tokens before issuing a new one.
+            $user->tokens()->delete();
+
+            $token = $user->createToken('auth_token')->plainTextToken;
+        } catch (QueryException $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Account is inactive. Please contact your administrator.',
-            ], 403);
+                'message' => 'Tenant database is not initialized yet. Please contact support.',
+            ], 503);
         }
-
-        // Ensure the user has a Spatie role before issuing a token.
-        // This prevents unexpected 403 when routes are protected by role middleware.
-        $this->ensureSpatieRole($user);
-
-        // Revoke all previous tokens before issuing a new one.
-        $user->tokens()->delete();
-
-        $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
             'success' => true,
