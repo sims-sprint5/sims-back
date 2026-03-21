@@ -103,7 +103,7 @@ class RolesAndPermissionsSeeder extends Seeder
         // Backfill roles for existing users based on legacy users.role column.
         // This avoids breaking existing deployments when role middleware is enabled.
         foreach (User::query()->orderBy('user_id')->cursor() as $user) {
-            /** @var \App\Models\User $user */
+            /** @var User $user */
             if ($user->roles()->exists()) {
                 continue;
             }

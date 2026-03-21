@@ -1,12 +1,22 @@
 <?php
 
+use App\Http\Middleware\Authenticate;
+use App\Http\Middleware\CorsMiddleware;
+use App\Http\Middleware\EnsureSuperAdmin;
+use App\Http\Middleware\EnsureTenantUser;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Validation\ValidationException;
+use Spatie\Permission\Middleware\PermissionMiddleware;
+use Spatie\Permission\Middleware\RoleMiddleware;
+use Spatie\Permission\Middleware\RoleOrPermissionMiddleware;
+use Stancl\Tenancy\Middleware\InitializeTenancyBySubdomain;
+use Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -17,25 +27,25 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         // Global CORS – must run before everything else
-        $middleware->prepend(\App\Http\Middleware\CorsMiddleware::class);
+        $middleware->prepend(CorsMiddleware::class);
 
         // Tenancy must initialize before access-prevention check
         $middleware->priority([
-            \Stancl\Tenancy\Middleware\InitializeTenancyBySubdomain::class,
-            \Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains::class,
-            \Illuminate\Routing\Middleware\SubstituteBindings::class,
+            InitializeTenancyBySubdomain::class,
+            PreventAccessFromCentralDomains::class,
+            SubstituteBindings::class,
         ]);
 
         $middleware->alias([
             // Override default auth redirect behavior for API (avoid Route [login] not defined)
-            'auth' => \App\Http\Middleware\Authenticate::class,
-            'ensure.superadmin' => \App\Http\Middleware\EnsureSuperAdmin::class,
-            'ensure.tenant' => \App\Http\Middleware\EnsureTenantUser::class,
+            'auth' => Authenticate::class,
+            'ensure.superadmin' => EnsureSuperAdmin::class,
+            'ensure.tenant' => EnsureTenantUser::class,
 
             // Spatie Laravel Permission
-            'role' => \Spatie\Permission\Middleware\RoleMiddleware::class,
-            'permission' => \Spatie\Permission\Middleware\PermissionMiddleware::class,
-            'role_or_permission' => \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class,
+            'role' => RoleMiddleware::class,
+            'permission' => PermissionMiddleware::class,
+            'role_or_permission' => RoleOrPermissionMiddleware::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

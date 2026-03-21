@@ -5,6 +5,7 @@ namespace Tests\Tenant;
 use App\Models\SuperAdmin;
 use App\Models\Tenant;
 use Illuminate\Foundation\Testing\WithFaker;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
@@ -31,7 +32,7 @@ class TenantLifecycleTest extends TestCase
             tenancy()->end();
         }
 
-        \Illuminate\Support\Facades\Auth::forgetGuards();
+        Auth::forgetGuards();
 
         return $response;
     }

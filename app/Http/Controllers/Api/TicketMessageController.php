@@ -83,8 +83,8 @@ class TicketMessageController extends Controller
         $ticketMessage = TicketMessage::create([
             'ticket_id' => $ticket->getKey(),
             'sender_id' => $user->getKey(),          // always from the token
-            'message'   => $validated['message'],
-            'is_admin'  => $this->isAdmin($request),  // calculated from the token
+            'message' => $validated['message'],
+            'is_admin' => $this->isAdmin($request),  // calculated from the token
         ]);
 
         $ticketMessage->forceFill(['created_at' => now()])->save();

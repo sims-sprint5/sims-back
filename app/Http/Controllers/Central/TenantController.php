@@ -4,8 +4,10 @@ namespace App\Http\Controllers\Central;
 
 use App\Http\Controllers\Controller;
 use App\Models\Tenant;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 
 class TenantController extends Controller
@@ -124,13 +126,13 @@ class TenantController extends Controller
         return response()->json($tenant);
     }
 
-    public function update (string $id, Request $request)
+    public function update(string $id, Request $request)
     {
         $request->validate([
             'name' => 'sometimes|required|string|max:255',
             'admin_name' => 'nullable|string|max:255',
             'admin_email' => 'nullable|email|max:255',
-            'admin_password' => 'nullable|string|min:8'
+            'admin_password' => 'nullable|string|min:8',
         ]);
 
         $tenant = Tenant::with('domains')->findOrFail($id);
@@ -144,9 +146,9 @@ class TenantController extends Controller
 
             tenancy()->initialize($tenant);
 
-            $admin = \App\Models\User::where('email', $tenant->admin_email)->first();
+            $admin = User::where('email', $tenant->admin_email)->first();
             if ($admin) {
-                $admin->password = \Illuminate\Support\Facades\Hash::make($request->admin_password);
+                $admin->password = Hash::make($request->admin_password);
                 $admin->save();
             }
 

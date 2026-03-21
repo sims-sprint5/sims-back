@@ -1,5 +1,8 @@
 <?php
 
+use App\Models\SuperAdmin;
+use App\Models\User;
+
 return [
 
     /*
@@ -41,7 +44,6 @@ return [
             'provider' => 'users',
         ],
 
-    
         'sanctum' => [
             'driver' => 'sanctum',
         ],
@@ -72,12 +74,12 @@ return [
     'providers' => [
         'users' => [
             'driver' => 'eloquent',
-            'model' => env('AUTH_MODEL', App\Models\User::class),
+            'model' => env('AUTH_MODEL', User::class),
         ],
 
         'superadmins' => [
             'driver' => 'eloquent',
-            'model' => App\Models\SuperAdmin::class,
+            'model' => SuperAdmin::class,
         ],
 
         // 'users' => [
