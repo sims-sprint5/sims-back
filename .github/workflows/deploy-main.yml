@@ -108,7 +108,7 @@ jobs:
           SSH_HOST: ${{ secrets.DEPLOY_HOST }}
         run: |
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" \
-            "cd /var/www/sims-back && git pull origin main"
+            "git config --global --add safe.directory /var/www/sims-back && cd /var/www/sims-back && git pull origin main"
 
       - name: Normalize production env for tenant subdomains
         env:
