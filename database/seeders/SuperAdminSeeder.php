@@ -10,9 +10,13 @@ class SuperAdminSeeder extends Seeder
 {
     public function run(): void
     {
-        $email = trim((string) (env('SUPERADMIN_EMAIL') ?? ''));
-        $name = trim((string) (env('SUPERADMIN_NAME') ?? ''));
-        $password = (string) (env('SUPERADMIN_PASSWORD') ?? 'changeme');
+        $email = trim((string) config('superadmin.email', ''));
+        $name = trim((string) config('superadmin.name', ''));
+        $password = (string) config('superadmin.password', '');
+
+        if (app()->environment('production') && ($email === '' || $name === '' || $password === '')) {
+            throw new \RuntimeException('Missing SUPERADMIN_NAME, SUPERADMIN_EMAIL or SUPERADMIN_PASSWORD in production environment.');
+        }
 
         if ($email === '') {
             $email = 'superadmin@example.com';
@@ -20,6 +24,10 @@ class SuperAdminSeeder extends Seeder
 
         if ($name === '') {
             $name = 'Super Admin';
+        }
+
+        if ($password === '') {
+            $password = 'changeme';
         }
 
         SuperAdmin::updateOrCreate(
