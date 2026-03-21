@@ -15,7 +15,7 @@ class AuthController extends Controller
 {
     private function ensureSpatieRole(User $user): void
     {
-        if (! Schema::hasTable('roles') || ! Schema::hasTable('model_has_roles')) {
+        if (!Schema::hasTable('roles') || !Schema::hasTable('model_has_roles')) {
             return;
         }
 
@@ -112,7 +112,7 @@ class AuthController extends Controller
             $this->ensureSpatieRole($user);
 
             // If tenant migrations are incomplete, avoid opaque 500 and return actionable error.
-            if (! Schema::hasTable('personal_access_tokens')) {
+            if (!Schema::hasTable('personal_access_tokens')) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Tenant database is not initialized yet. Please contact support.',
