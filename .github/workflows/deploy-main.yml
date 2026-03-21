@@ -217,11 +217,13 @@ jobs:
           cd /var/www/sims-back
 
           docker-compose exec -T api php -r '
-          require "bootstrap/app.php";
-          $app = require_once "bootstrap/app.php";
+          require "vendor/autoload.php";
+          $app = require "bootstrap/app.php";
+          $kernel = $app->make(Illuminate\Contracts\Console\Kernel::class);
+          $kernel->bootstrap();
           $tenants = Illuminate\Support\Facades\DB::table("tenants")->pluck("id");
           foreach ($tenants as $id) {
-              Illuminate\Support\Facades\DB::statement("CREATE SCHEMA IF NOT EXISTS tenant_" . $id);
+            Illuminate\Support\Facades\DB::statement("CREATE SCHEMA IF NOT EXISTS tenant_" . $id);
           }
           '
 
