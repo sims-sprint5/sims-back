@@ -85,9 +85,9 @@ class TicketMessageController extends Controller
             'sender_id' => $user->getKey(),          // always from the token
             'message'   => $validated['message'],
             'is_admin'  => $this->isAdmin($request),  // calculated from the token
-            'created_at' => now(),
         ]);
 
+        $ticketMessage->forceFill(['created_at' => now()])->save();
         $ticketMessage->load('user');
 
         return response()->json([
