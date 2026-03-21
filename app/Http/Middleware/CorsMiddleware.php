@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\Response;
 
 class CorsMiddleware
@@ -74,7 +75,20 @@ class CorsMiddleware
 
         // Check against regex patterns
         foreach ($config['allowed_origins_patterns'] as $pattern) {
-            if (preg_match($pattern, $origin)) {
+            if (! is_string($pattern) || trim($pattern) === '') {
+                continue;
+            }
+
+            $matchResult = @preg_match($pattern, $origin);
+
+            if ($matchResult === false) {
+                Log::warning('Invalid CORS origin regex pattern ignored.', [
+                    'pattern' => $pattern,
+                ]);
+                continue;
+            }
+
+            if ($matchResult === 1) {
                 return true;
             }
         }
