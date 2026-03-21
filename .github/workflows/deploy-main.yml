@@ -212,8 +212,19 @@ jobs:
           SSH_USER: ${{ secrets.DEPLOY_USER }}
           SSH_HOST: ${{ secrets.DEPLOY_HOST }}
         run: |
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" \
-            "cd /var/www/sims-back && docker-compose exec -T api php artisan tenants:migrate --force"
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" << 'EOF'
+          set -euo pipefail
+          cd /var/www/sims-back
+
+          docker-compose exec -T api php artisan tinker --execute='
+            $connection = config("tenancy.database.central_connection", "pgsql");
+            foreach (\App\Models\Tenant::query()->pluck("id") as $tenantId) {
+                \Illuminate\Support\Facades\DB::connection($connection)->statement("CREATE SCHEMA IF NOT EXISTS tenant_{$tenantId}");
+            }
+          '
+
+          docker-compose exec -T api php artisan tenants:migrate --force
+          EOF
 
       - name: Run Laravel seeders
         env:
