@@ -7,31 +7,48 @@ use App\Models\User;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 use Spatie\Permission\Models\Role;
+use Throwable;
 
 class AuthController extends Controller
 {
     private function ensureSpatieRole(User $user): void
     {
+        if (! class_exists(Role::class)) {
+            return;
+        }
+
         if (! Schema::hasTable('roles') || ! Schema::hasTable('model_has_roles')) {
             return;
         }
 
-        if ($user->roles()->exists()) {
+        if (! method_exists($user, 'roles') || ! method_exists($user, 'assignRole')) {
             return;
         }
 
-        // Spatie roles for tenant Users are stored under the 'web' guard.
-        // This must not depend on auth.defaults.guard.
-        $guardName = 'web';
-        $legacyRole = strtolower((string) ($user->role ?? ''));
+        try {
+            if ($user->roles()->exists()) {
+                return;
+            }
 
-        $roleName = $legacyRole === 'admin' ? 'Admin' : 'Usuario';
+            // Spatie roles for tenant Users are stored under the 'web' guard.
+            // This must not depend on auth.defaults.guard.
+            $guardName = 'web';
+            $legacyRole = strtolower((string) ($user->role ?? ''));
 
-        $role = Role::findOrCreate($roleName, $guardName);
-        $user->assignRole($role);
+            $roleName = $legacyRole === 'admin' ? 'Admin' : 'Usuario';
+
+            $role = Role::findOrCreate($roleName, $guardName);
+            $user->assignRole($role);
+        } catch (Throwable $e) {
+            Log::warning('Skipping Spatie role sync during login/register.', [
+                'user_id' => $user->user_id,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**
@@ -127,6 +144,16 @@ class AuthController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Tenant database is not initialized yet. Please contact support.',
+            ], 503);
+        } catch (Throwable $e) {
+            Log::error('Tenant login failed with unexpected error.', [
+                'email' => $request->email,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Temporary login issue. Please try again in a moment or contact support.',
             ], 503);
         }
 
