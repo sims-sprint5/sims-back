@@ -10,11 +10,23 @@ class SuperAdminSeeder extends Seeder
 {
     public function run(): void
     {
-        SuperAdmin::firstOrCreate(
-            ['email' => env('SUPERADMIN_EMAIL')],
+        $email = trim((string) (env('SUPERADMIN_EMAIL') ?? ''));
+        $name = trim((string) (env('SUPERADMIN_NAME') ?? ''));
+        $password = (string) (env('SUPERADMIN_PASSWORD') ?? 'changeme');
+
+        if ($email === '') {
+            $email = 'superadmin@example.com';
+        }
+
+        if ($name === '') {
+            $name = 'Super Admin';
+        }
+
+        SuperAdmin::updateOrCreate(
+            ['email' => $email],
             [
-                'name' => env('SUPERADMIN_NAME'),
-                'password' => Hash::make(env('SUPERADMIN_PASSWORD', 'changeme')),
+                'name' => $name,
+                'password' => Hash::make($password),
             ]
         );
     }
