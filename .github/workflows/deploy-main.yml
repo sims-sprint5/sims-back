@@ -133,6 +133,15 @@ jobs:
             fi
           }
 
+          set_env_if_missing() {
+            key="$1"
+            value="$2"
+            current="$(grep "^${key}=" .env | head -n1 | cut -d= -f2- | tr -d '\r' || true)"
+            if [ -z "$current" ]; then
+              set_env "$key" "$value"
+            fi
+          }
+
           app_domain="$(grep '^APP_DOMAIN=' .env | head -n1 | cut -d= -f2- | tr -d '\r' || true)"
           app_url="$(grep '^APP_URL=' .env | head -n1 | cut -d= -f2- | tr -d '\r' || true)"
 
@@ -156,6 +165,11 @@ jobs:
 
           cors_pattern="#^https?://[a-z0-9-]+[.]${app_domain//./[.]}(:[0-9]+)?\$#i"
           set_env CORS_ALLOWED_ORIGINS_PATTERNS "$cors_pattern"
+
+          # SuperAdmin credentials (only set defaults when missing)
+          set_env_if_missing SUPERADMIN_NAME "Super Admin"
+          set_env_if_missing SUPERADMIN_EMAIL "superadmin@example.com"
+          set_env_if_missing SUPERADMIN_PASSWORD "change_this_superadmin_password"
 
           # Corrige truncados/copias rotas de env anteriores
           sed -i 's/>$//' .env
@@ -200,6 +214,15 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" \
             "cd /var/www/sims-back && docker-compose exec -T api php artisan db:seed --force"
+
+      - name: Ensure SuperAdmin exists and password matches env
+        env:
+          SSH_USER: ${{ secrets.DEPLOY_USER }}
+          SSH_HOST: ${{ secrets.DEPLOY_HOST }}
+        run: |
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" \
+            "cd /var/www/sims-back && \
+             docker-compose exec -T api php artisan db:seed --class=Database\\Seeders\\SuperAdminSeeder --force"
 
       - name: Restart containers
         env:
