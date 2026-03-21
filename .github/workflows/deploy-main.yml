@@ -222,7 +222,7 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" \
             "cd /var/www/sims-back && \
-             docker-compose exec -T api php artisan db:seed --class=Database\\Seeders\\SuperAdminSeeder --force"
+             docker-compose exec -T api php artisan db:seed --class=SuperAdminSeeder --force"
 
       - name: Restart containers
         env:
