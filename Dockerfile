@@ -14,6 +14,10 @@ RUN apt-get update && apt-get install -y \
     libpq-dev \
     libzip-dev \
     libonig-dev \
+    certbot \
+    python3-certbot-nginx \
+    nginx \
+    sudo \
     && docker-php-ext-install pdo_pgsql mbstring zip \
     && rm -rf /var/lib/apt/lists/*
 
@@ -30,6 +34,9 @@ COPY . .
 RUN mkdir -p storage/logs bootstrap/cache \
     && chown -R www-data:www-data storage bootstrap \
     && chmod -R 775 storage bootstrap
+
+# Allow www-data to run certbot without password
+RUN echo 'www-data ALL=(ALL) NOPASSWD: /usr/bin/certbot, /usr/sbin/nginx' >> /etc/sudoers
 
 # 7️⃣ Instalar dependencias PHP con Composer
 RUN composer install --no-dev --optimize-autoloader

@@ -51,13 +51,13 @@ class TicketMessageController extends Controller
 
         $transformed = $messages->through(function ($msg) {
             return [
-                'id'         => $msg->getKey(),
-                'ticket_id'  => $msg->ticket_id,
-                'user_id'    => $msg->sender_id,
-                'message'    => $msg->message,
-                'is_admin'   => (bool) $msg->is_admin,
+                'id' => $msg->getKey(),
+                'ticket_id' => $msg->ticket_id,
+                'user_id' => $msg->sender_id,
+                'message' => $msg->message,
+                'is_admin' => (bool) $msg->is_admin,
                 'created_at' => $msg->created_at,
-                'user'       => ['name' => $msg->user?->name],
+                'user' => ['name' => $msg->user?->name],
             ];
         });
 
@@ -91,13 +91,13 @@ class TicketMessageController extends Controller
         $ticketMessage->load('user');
 
         return response()->json([
-            'id'         => $ticketMessage->getKey(),
-            'ticket_id'  => $ticketMessage->ticket_id,
-            'user_id'    => $ticketMessage->sender_id,
-            'message'    => $ticketMessage->message,
-            'is_admin'   => (bool) $ticketMessage->is_admin,
+            'id' => $ticketMessage->getKey(),
+            'ticket_id' => $ticketMessage->ticket_id,
+            'user_id' => $ticketMessage->sender_id,
+            'message' => $ticketMessage->message,
+            'is_admin' => (bool) $ticketMessage->is_admin,
             'created_at' => $ticketMessage->created_at,
-            'user'       => ['name' => $ticketMessage->user?->name],
+            'user' => ['name' => $ticketMessage->user?->name],
         ], 201);
     }
 }

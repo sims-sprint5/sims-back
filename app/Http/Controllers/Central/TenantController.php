@@ -5,8 +5,8 @@ namespace App\Http\Controllers\Central;
 use App\Http\Controllers\Controller;
 use App\Models\Tenant;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
-use Stancl\Tenancy\Jobs\SeedDatabase;
 
 class TenantController extends Controller
 {
@@ -27,6 +27,10 @@ class TenantController extends Controller
 
         $tenantId = $request->id;
         $baseDomain = env('TENANT_BASE_DOMAIN', 'localhost');
+        $defaultTenantAdminPassword = (string) env('TENANT_DEFAULT_ADMIN_PASSWORD', 'password123');
+        $adminPassword = $request->filled('admin_password')
+            ? (string) $request->admin_password
+            : $defaultTenantAdminPassword;
 
         $parsed = parse_url(config('app.url'));
         $scheme = $parsed['scheme'] ?? 'http';
@@ -39,25 +43,67 @@ class TenantController extends Controller
             'name' => $request->name,
             'admin_name' => $request->admin_name ?? 'Admin '.ucfirst($tenantId),
             'admin_email' => $adminEmail,
-            'admin_password' => $request->admin_password ?? '',
+            'admin_password' => $adminPassword,
         ]);
 
         $tenant->domains()->create(['domain' => $tenantId]);
 
-        // Run seed explicitly (isolated from schema+migrate pipeline).
-        // If the seed fails, roll back the tenant creation so the DB stays
-        // consistent and the caller receives a clear 500 error instead of a
-        // silent partial-success.
         try {
-            SeedDatabase::dispatchSync($tenant);
+            $this->safeLog('info', "Running tenant migrations for '{$tenantId}'...");
+            Artisan::call('tenants:migrate', [
+                '--tenants' => [$tenantId],
+                '--force' => true,
+            ]);
+            $migrateOutput = Artisan::output();
+
+            $this->safeLog('info', "Running tenant seeder for '{$tenantId}'...");
+            Artisan::call('tenants:seed', [
+                '--tenants' => [$tenantId],
+                '--force' => true,
+            ]);
+            $seedOutput = Artisan::output();
+
+            $this->safeLog('info', "Tenant database initialized for '{$tenantId}'", [
+                'migrate_output' => $migrateOutput,
+                'seed_output' => $seedOutput,
+            ]);
         } catch (\Throwable $e) {
-            Log::error("Tenant seed failed for '{$tenantId}': ".$e->getMessage());
+            $this->safeLog('error', "Tenant bootstrap failed for '{$tenantId}': ".$e->getMessage());
+            $this->safeLog('error', $e->getTraceAsString());
             $tenant->delete();
 
             return response()->json([
-                'message' => 'Tenant creation failed during database seeding.',
+                'message' => 'Tenant creation failed during migrate/seed.',
                 'error' => $e->getMessage(),
             ], 500);
+        }
+
+        // Generate SSL certificate synchronously using Name.com DNS-01 script
+        $domain = "{$tenantId}.{$baseDomain}";
+        $sslScriptPath = base_path((string) env('SSL_DNS_SCRIPT_PATH', 'scripts/namecom_certbot_dns01.py'));
+
+        try {
+            $this->safeLog('info', "Generating SSL certificate for {$domain} using DNS-01 script...");
+
+            if (! file_exists($sslScriptPath)) {
+                throw new \RuntimeException("SSL script not found at: {$sslScriptPath}");
+            }
+
+            $command = sprintf(
+                'python3 %s --mode issue --domain %s --subdomain %s 2>&1',
+                escapeshellarg($sslScriptPath),
+                escapeshellarg($baseDomain),
+                escapeshellarg($tenantId)
+            );
+            $output = shell_exec($command);
+
+            $this->safeLog('info', "SSL certificate command executed for {$domain}", [
+                'script' => $sslScriptPath,
+                'output' => $output,
+            ]);
+        } catch (\Throwable $e) {
+            $this->safeLog('warning', "SSL generation warning for {$domain}: ".$e->getMessage());
+            // Don't fail tenant creation if SSL fails
         }
 
         return response()->json([
@@ -66,6 +112,7 @@ class TenantController extends Controller
             'access' => [
                 'url' => "{$scheme}://{$tenantId}.{$baseDomain}{$port}",
                 'admin_email' => $adminEmail,
+                'admin_password' => $adminPassword,
             ],
         ], 201);
     }
@@ -120,5 +167,13 @@ class TenantController extends Controller
         $tenant->delete();
 
         return response()->json(['message' => "Tenant '{$id}' deleted successfully."]);
+    }
+
+    private function safeLog(string $level, string $message, array $context = []): void
+    {
+        try {
+            Log::{$level}($message, $context);
+        } catch (\Throwable $e) {
+        }
     }
 }

@@ -8,7 +8,6 @@ use Illuminate\Foundation\Testing\WithFaker;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
-
 class TenantLifecycleTest extends TestCase
 {
     use WithFaker;
@@ -23,7 +22,6 @@ class TenantLifecycleTest extends TestCase
 
     /** Run central migrations once per test class, not before every test. */
     private static bool $migrated = false;
-
 
     public function call($method, $uri, $parameters = [], $cookies = [], $files = [], $server = [], $content = null)
     {
