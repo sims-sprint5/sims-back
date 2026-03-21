@@ -117,7 +117,7 @@ class TenantController extends Controller
             $this->safeLog('info', "Generating SSL certificate for {$domain} using DNS-01 script...");
 
             if (! file_exists($sslScriptPath)) {
-                throw new \RuntimeException("SSL script not found at: {$sslScriptPath}");
+                throw new RuntimeException("SSL script not found at: {$sslScriptPath}");
             }
 
             $command = sprintf(
@@ -132,7 +132,7 @@ class TenantController extends Controller
                 'script' => $sslScriptPath,
                 'output' => $output,
             ]);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             $this->safeLog('warning', "SSL generation warning for {$domain}: ".$e->getMessage());
             // Don't fail tenant creation if SSL fails
         }
