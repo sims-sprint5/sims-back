@@ -6,6 +6,7 @@ use App\Http\Middleware\EnsureSuperAdmin;
 use App\Http\Middleware\EnsureTenantUser;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -15,6 +16,7 @@ use Illuminate\Validation\ValidationException;
 use Spatie\Permission\Middleware\PermissionMiddleware;
 use Spatie\Permission\Middleware\RoleMiddleware;
 use Spatie\Permission\Middleware\RoleOrPermissionMiddleware;
+use Stancl\Tenancy\Exceptions\TenantCouldNotBeIdentifiedOnDomainException;
 use Stancl\Tenancy\Middleware\InitializeTenancyBySubdomain;
 use Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains;
 
@@ -49,9 +51,18 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        $exceptions->render(function (TenantCouldNotBeIdentifiedOnDomainException $e, Request $request) {
+            if ($request->is('api/*')) {
+                return response()->json([
+                    'message' => 'Tenant not found for this domain.',
+                ], 404);
+            }
+        });
+
         $exceptions->render(function (AuthenticationException $e, Request $request) {
             return response()->json(['message' => 'Unauthenticated.'], 401);
         });
+
         $exceptions->render(function (ValidationException $e, Request $request) {
             if ($request->is('api/*')) {
                 return response()->json([
@@ -60,6 +71,28 @@ return Application::configure(basePath: dirname(__DIR__))
                 ], 422);
             }
         });
+
+        $exceptions->render(function (QueryException $e, Request $request) {
+            if (! $request->is('api/*')) {
+                return null;
+            }
+
+            $errorInfo = $e->errorInfo ?? [];
+            $sqlState = (string) ($errorInfo[0] ?? '');
+            $message = $e->getMessage();
+
+            $missingRelation = $sqlState === '42P01' || str_contains($message, 'SQLSTATE[42P01]');
+            $dbUnavailable = $sqlState === '08006' || str_contains($message, 'SQLSTATE[08006]');
+
+            if ($missingRelation || $dbUnavailable) {
+                return response()->json([
+                    'message' => 'Tenant database is not initialized yet. Please contact support.',
+                ], 503);
+            }
+
+            return null;
+        });
+
         $exceptions->render(function (ModelNotFoundException $e, Request $request) {
             if ($request->is('api/*')) {
                 return response()->json(['message' => 'Recurso no encontrado.'], 404);
