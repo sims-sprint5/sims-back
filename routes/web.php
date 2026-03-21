@@ -10,9 +10,17 @@ $isCentralHost = static function (Request $request): bool {
     return in_array($host, $centralDomains, true);
 };
 
-Route::get('/', function (Request $request) use ($isCentralHost) {
+Route::get('/welcome', function (Request $request) use ($isCentralHost) {
     if ($isCentralHost($request)) {
         return view('welcome');
+    }
+
+    abort(404);
+});
+
+Route::get('/', function (Request $request) use ($isCentralHost) {
+    if ($isCentralHost($request)) {
+        return redirect('/welcome');
     }
 
     abort(404);
