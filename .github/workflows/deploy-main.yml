@@ -216,11 +216,13 @@ jobs:
           set -euo pipefail
           cd /var/www/sims-back
 
-          docker-compose exec -T -e PSYSH_CONFIG_DIR=/tmp api php artisan tinker --execute='
-            $connection = config("tenancy.database.central_connection", "pgsql");
-            foreach (\App\Models\Tenant::query()->pluck("id") as $tenantId) {
-                \Illuminate\Support\Facades\DB::connection($connection)->statement("CREATE SCHEMA IF NOT EXISTS tenant_{$tenantId}");
-            }
+          docker-compose exec -T api php -r '
+          require "bootstrap/app.php";
+          $app = require_once "bootstrap/app.php";
+          $tenants = Illuminate\Support\Facades\DB::table("tenants")->pluck("id");
+          foreach ($tenants as $id) {
+              Illuminate\Support\Facades\DB::statement("CREATE SCHEMA IF NOT EXISTS tenant_" . $id);
+          }
           '
 
           docker-compose exec -T api php artisan tenants:migrate --force
