@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Central;
 use App\Http\Controllers\Controller;
 use App\Models\Tenant;
 use App\Models\User;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -23,7 +24,11 @@ class TenantController extends Controller
 
     public function store(Request $request)
     {
+        $this->safeLog('info', '=== [TENANT CREATE] Request started ===');
+
         if (! $this->isCentralSchemaReady()) {
+            $this->safeLog('error', '[TENANT CREATE] Central schema not ready');
+
             return response()->json([
                 'message' => 'Central database is not initialized. Run central migrations first.',
             ], 503);
@@ -31,20 +36,29 @@ class TenantController extends Controller
 
         try {
             DB::connection()->getPdo();
+            $this->safeLog('info', '[TENANT CREATE] DB connection OK');
         } catch (Throwable $e) {
+            $this->safeLog('error', '[TENANT CREATE] DB connection failed: '.$e->getMessage());
+
             return response()->json([
                 'message' => 'Central database connection failed. Please verify DB host/credentials.',
                 'error' => $e->getMessage(),
             ], 503);
         }
 
-        $request->validate([
-            'id' => 'required|string|alpha_dash|max:50',
-            'name' => 'required|string|max:255',
-            'admin_name' => 'nullable|string|max:255',
-            'admin_email' => 'nullable|email|max:255',
-            'admin_password' => 'nullable|string|min:8',
-        ]);
+        try {
+            $request->validate([
+                'id' => 'required|string|alpha_dash|max:50',
+                'name' => 'required|string|max:255',
+                'admin_name' => 'nullable|string|max:255',
+                'admin_email' => 'nullable|email|max:255',
+                'admin_password' => 'nullable|string|min:8',
+            ]);
+            $this->safeLog('info', '[TENANT CREATE] Validation passed');
+        } catch (Throwable $e) {
+            $this->safeLog('error', '[TENANT CREATE] Validation error: '.$e->getMessage());
+            throw $e;
+        }
 
         $tenantId = strtolower((string) $request->id);
         $baseDomain = env('TENANT_BASE_DOMAIN', 'localhost');
@@ -53,37 +67,69 @@ class TenantController extends Controller
             ? (string) $request->admin_password
             : $defaultTenantAdminPassword;
 
-        $parsed = parse_url(config('app.url'));
-        $scheme = $parsed['scheme'] ?? 'http';
-        $port = isset($parsed['port']) ? ':'.$parsed['port'] : '';
+        $parsedUrl = parse_url((string) config('app.url', ''));
+        $scheme = is_array($parsedUrl) ? ($parsedUrl['scheme'] ?? 'http') : 'http';
+        $port = is_array($parsedUrl) && isset($parsedUrl['port']) ? ':'.$parsedUrl['port'] : '';
 
         $adminEmail = $request->admin_email ?? "admin@{$tenantId}.{$baseDomain}";
+        $tenant = null;
+        $isExistingTenant = false;
 
-        $tenant = Tenant::query()->find($tenantId);
-        $isExistingTenant = (bool) $tenant;
+        // Step 1: Create or update tenant record and domains
+        // This is the core operation - if this fails, we exit immediately without rollback
+        try {
+            $this->safeLog('info', "[TENANT CREATE] Step 1: Looking up tenant '{$tenantId}'");
+            $tenant = Tenant::query()->find($tenantId);
+            $isExistingTenant = (bool) $tenant;
 
-        if (! $tenant) {
-            $tenant = Tenant::create([
-                'id' => $tenantId,
-                'name' => $request->name,
-                'admin_name' => $request->admin_name ?? 'Admin '.ucfirst($tenantId),
-                'admin_email' => $adminEmail,
-                'admin_password' => $adminPassword,
-            ]);
-        } else {
-            $tenant->update([
-                'name' => $request->name,
-                'admin_name' => $request->admin_name ?? ($tenant->admin_name ?? 'Admin '.ucfirst($tenantId)),
-                'admin_email' => $adminEmail,
-                'admin_password' => $adminPassword,
-            ]);
+            if (! $tenant) {
+                $this->safeLog('info', "[TENANT CREATE] Creating NEW tenant '{$tenantId}'");
+                $tenant = Tenant::create([
+                    'id' => $tenantId,
+                    'name' => $request->name,
+                    'admin_name' => $request->admin_name ?? 'Admin '.ucfirst($tenantId),
+                    'admin_email' => $adminEmail,
+                    'admin_password' => $adminPassword,
+                ]);
+                $this->safeLog('info', "[TENANT CREATE] Tenant created: {$tenant->id}");
+            } else {
+                $this->safeLog('info', "[TENANT CREATE] Updating EXISTING tenant '{$tenantId}'");
+                $tenant->update([
+                    'name' => $request->name,
+                    'admin_name' => $request->admin_name ?? ($tenant->admin_name ?? 'Admin '.ucfirst($tenantId)),
+                    'admin_email' => $adminEmail,
+                    'admin_password' => $adminPassword,
+                ]);
+                $this->safeLog('info', "[TENANT CREATE] Tenant updated: {$tenant->id}");
+            }
+
+            $this->safeLog('info', '[TENANT CREATE] Creating domains');
+            $tenant->domains()->firstOrCreate(['domain' => $tenantId]);
+            $tenant->domains()->firstOrCreate(['domain' => "{$tenantId}.{$baseDomain}"]);
+
+            $this->safeLog('info', "[TENANT CREATE] ✓ Tenant '{$tenantId}' in database");
+        } catch (QueryException $e) {
+            $this->safeLog('error', '[TENANT CREATE] ❌ DB error: '.$e->getMessage());
+            $this->safeLog('error', '[TENANT CREATE] SQL State: '.($e->errorInfo[0] ?? 'unknown'));
+
+            return response()->json([
+                'message' => 'Failed to create/update tenant in database.',
+                'error' => $e->getMessage(),
+            ], 500);
+        } catch (Throwable $e) {
+            $this->safeLog('error', '[TENANT CREATE] ❌ Error: '.$e->getMessage());
+            $this->safeLog('error', '[TENANT CREATE] Type: '.class_basename($e));
+
+            return response()->json([
+                'message' => 'Failed to create tenant.',
+                'error' => $e->getMessage(),
+            ], 500);
         }
 
-        $tenant->domains()->firstOrCreate(['domain' => $tenantId]);
-        $tenant->domains()->firstOrCreate(['domain' => "{$tenantId}.{$baseDomain}"]);
-
+        // Step 2: Run migrate:fresh + seed
+        // These are secondary operations - if they fail, the tenant already exists
         try {
-            $this->safeLog('info', "Running tenant migrate:fresh for '{$tenantId}'...");
+            $this->safeLog('info', "[TENANT CREATE] Step 2: migrate:fresh for '{$tenantId}'");
             $migrateFreshExitCode = Artisan::call('tenants:migrate-fresh', [
                 '--tenants' => [$tenantId],
                 '--force' => true,
@@ -92,69 +138,82 @@ class TenantController extends Controller
             $migrateFreshOutput = Artisan::output();
 
             if ($migrateFreshExitCode !== 0) {
-                throw new RuntimeException("Tenant migrate:fresh failed for '{$tenantId}'. Output: {$migrateFreshOutput}");
+                $this->safeLog('error', "[TENANT CREATE] migrate:fresh exit code: {$migrateFreshExitCode}");
+                $this->safeLog('error', "[TENANT CREATE] migrate:fresh output: {$migrateFreshOutput}");
+                throw new RuntimeException("Migration failed (exit code {$migrateFreshExitCode}): {$migrateFreshOutput}");
             }
+            $this->safeLog('info', '[TENANT CREATE] ✓ migrate:fresh OK');
 
-            $this->safeLog('info', "Running tenant seed for '{$tenantId}'...");
+            $this->safeLog('info', "[TENANT CREATE] Step 3: seed for '{$tenantId}'");
             $seedExitCode = Artisan::call('tenants:seed', [
                 '--tenants' => [$tenantId],
                 '--class' => 'TenantDatabaseSeeder',
-                '--force' => true,
                 '--no-interaction' => true,
             ]);
             $seedOutput = Artisan::output();
 
             if ($seedExitCode !== 0) {
-                throw new RuntimeException("Tenant seed failed for '{$tenantId}'. Output: {$seedOutput}");
+                $this->safeLog('error', "[TENANT CREATE] seed exit code: {$seedExitCode}");
+                $this->safeLog('error', "[TENANT CREATE] seed output: {$seedOutput}");
+                throw new RuntimeException("Seeding failed (exit code {$seedExitCode}): {$seedOutput}");
             }
+            $this->safeLog('info', '[TENANT CREATE] ✓ seed OK');
 
+            $this->safeLog('info', '[TENANT CREATE] Step 4: asserting initialization');
             $this->assertTenantInitialized($tenant, $adminEmail);
+            $this->safeLog('info', '[TENANT CREATE] ✓ initialization OK');
+
+            $this->safeLog('info', '[TENANT CREATE] Step 5: clearing admin password');
             $tenant->update(['admin_password' => null]);
+            $this->safeLog('info', '[TENANT CREATE] ✓ password cleared');
 
-            $this->safeLog('info', "Tenant database initialized for '{$tenantId}'", [
-                'migrate_fresh_output' => $migrateFreshOutput,
-                'seed_output' => $seedOutput,
-            ]);
+            $this->safeLog('info', '[TENANT CREATE] === SUCCESS ===');
         } catch (Throwable $e) {
-            $this->safeLog('error', "Tenant bootstrap failed for '{$tenantId}': ".$e->getMessage());
-            $this->safeLog('error', $e->getTraceAsString());
-
-            if (! $isExistingTenant) {
-                $tenant->delete();
+            $this->safeLog('error', '[TENANT CREATE] ❌ migrate/seed failed: '.$e->getMessage());
+            $this->safeLog('error', '[TENANT CREATE] Type: '.class_basename($e));
+            foreach (explode("\n", $e->getTraceAsString()) as $line) {
+                if (trim($line)) {
+                    $this->safeLog('error', '[TENANT CREATE] '.$line);
+                }
             }
 
+            // Tenant already exists in DB - just log the error but don't delete it
             return response()->json([
-                'message' => 'Tenant provisioning failed during migrate:fresh + seed.',
+                'message' => 'Tenant created but initialization failed.',
                 'error' => $e->getMessage(),
+                'tenant' => $tenant->load('domains'),
+                'note' => 'Tenant exists but may lack data. Contact admin to retry seeding.',
             ], 500);
         }
 
-        // Generate SSL certificate synchronously using Name.com DNS-01 script
-        $domain = "{$tenantId}.{$baseDomain}";
-        $sslScriptPath = base_path((string) env('SSL_DNS_SCRIPT_PATH', 'scripts/namecom_certbot_dns01.py'));
+        // Generate SSL certificate synchronously using Name.com DNS-01 script (skip in testing)
+        if (! app()->environment('testing')) {
+            $domain = "{$tenantId}.{$baseDomain}";
+            $sslScriptPath = base_path((string) env('SSL_DNS_SCRIPT_PATH', 'scripts/namecom_certbot_dns01.py'));
 
-        try {
-            $this->safeLog('info', "Generating SSL certificate for {$domain} using DNS-01 script...");
+            try {
+                $this->safeLog('info', "Generating SSL certificate for {$domain} using DNS-01 script...");
 
-            if (! file_exists($sslScriptPath)) {
-                throw new RuntimeException("SSL script not found at: {$sslScriptPath}");
+                if (! file_exists($sslScriptPath)) {
+                    throw new RuntimeException("SSL script not found at: {$sslScriptPath}");
+                }
+
+                $command = sprintf(
+                    'python3 %s --mode issue --domain %s --subdomain %s 2>&1',
+                    escapeshellarg($sslScriptPath),
+                    escapeshellarg($baseDomain),
+                    escapeshellarg($tenantId)
+                );
+                $output = shell_exec($command);
+
+                $this->safeLog('info', "SSL certificate command executed for {$domain}", [
+                    'script' => $sslScriptPath,
+                    'output' => $output,
+                ]);
+            } catch (Throwable $e) {
+                $this->safeLog('warning', "SSL generation warning for {$domain}: ".$e->getMessage());
+                // Don't fail tenant creation if SSL fails
             }
-
-            $command = sprintf(
-                'python3 %s --mode issue --domain %s --subdomain %s 2>&1',
-                escapeshellarg($sslScriptPath),
-                escapeshellarg($baseDomain),
-                escapeshellarg($tenantId)
-            );
-            $output = shell_exec($command);
-
-            $this->safeLog('info', "SSL certificate command executed for {$domain}", [
-                'script' => $sslScriptPath,
-                'output' => $output,
-            ]);
-        } catch (Throwable $e) {
-            $this->safeLog('warning', "SSL generation warning for {$domain}: ".$e->getMessage());
-            // Don't fail tenant creation if SSL fails
         }
 
         return response()->json([
