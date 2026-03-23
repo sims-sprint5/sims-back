@@ -148,7 +148,6 @@ class TenantController extends Controller
             $seedExitCode = Artisan::call('tenants:seed', [
                 '--tenants' => [$tenantId],
                 '--class' => 'TenantDatabaseSeeder',
-                '--force' => true,
                 '--no-interaction' => true,
             ]);
             $seedOutput = Artisan::output();
