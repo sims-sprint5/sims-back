@@ -89,6 +89,7 @@ class TenantController extends Controller
             $this->safeLog('info', "Running tenant migrate:fresh for '{$tenantId}'...");
             $migrateFreshExitCode = Artisan::call('tenants:migrate-fresh', [
                 '--tenants' => [$tenantId],
+                '--force' => true,
                 '--no-interaction' => true,
             ]);
             $migrateFreshOutput = Artisan::output();
@@ -117,13 +118,6 @@ class TenantController extends Controller
                 'migrate_fresh_output' => $migrateFreshOutput,
                 'seed_output' => $seedOutput,
             ]);
-        } catch (QueryException $e) {
-            $this->safeLog('error', "Tenant provisioning DB error for '{$tenantId}': ".$e->getMessage());
-
-            return response()->json([
-                'message' => 'Tenant provisioning failed due to a database constraint or connection issue.',
-                'error' => $e->getMessage(),
-            ], 500);
         } catch (Throwable $e) {
             $this->safeLog('error', "Tenant bootstrap failed for '{$tenantId}': ".$e->getMessage());
             $this->safeLog('error', $e->getTraceAsString());
@@ -134,6 +128,13 @@ class TenantController extends Controller
 
             return response()->json([
                 'message' => 'Tenant provisioning failed during migrate:fresh + seed.',
+                'error' => $e->getMessage(),
+            ], 500);
+        } catch (QueryException $e) {
+            $this->safeLog('error', "Tenant provisioning DB error for '{$tenantId}': ".$e->getMessage());
+
+            return response()->json([
+                'message' => 'Tenant provisioning failed due to a database constraint or connection issue.',
                 'error' => $e->getMessage(),
             ], 500);
         }
