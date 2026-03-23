@@ -132,7 +132,6 @@ class TenantController extends Controller
             $this->safeLog('info', "[TENANT CREATE] Step 2: migrate:fresh for '{$tenantId}'");
             $migrateFreshExitCode = Artisan::call('tenants:migrate-fresh', [
                 '--tenants' => [$tenantId],
-                '--force' => true,
                 '--no-interaction' => true,
             ]);
             $migrateFreshOutput = Artisan::output();
