@@ -83,21 +83,23 @@ class TenantController extends Controller
         $tenant->domains()->firstOrCreate(['domain' => "{$tenantId}.{$baseDomain}"]);
 
         try {
-            $this->safeLog('info', "Running tenant migrations for '{$tenantId}'...");
-            $migrateExitCode = Artisan::call('tenants:migrate', [
+            $this->safeLog('info', "Running tenant migrate:fresh for '{$tenantId}'...");
+            $migrateFreshExitCode = Artisan::call('tenants:migrate-fresh', [
                 '--tenants' => [$tenantId],
-                '--force' => true,
+                '--no-interaction' => true,
             ]);
-            $migrateOutput = Artisan::output();
+            $migrateFreshOutput = Artisan::output();
 
-            if ($migrateExitCode !== 0) {
-                throw new RuntimeException("Tenant migrate failed for '{$tenantId}'. Output: {$migrateOutput}");
+            if ($migrateFreshExitCode !== 0) {
+                throw new RuntimeException("Tenant migrate:fresh failed for '{$tenantId}'. Output: {$migrateFreshOutput}");
             }
 
-            $this->safeLog('info', "Running tenant seeder for '{$tenantId}'...");
+            $this->safeLog('info', "Running tenant seed for '{$tenantId}'...");
             $seedExitCode = Artisan::call('tenants:seed', [
                 '--tenants' => [$tenantId],
+                '--class' => 'TenantDatabaseSeeder',
                 '--force' => true,
+                '--no-interaction' => true,
             ]);
             $seedOutput = Artisan::output();
 
@@ -108,16 +110,19 @@ class TenantController extends Controller
             $this->assertTenantInitialized($tenant, $adminEmail);
 
             $this->safeLog('info', "Tenant database initialized for '{$tenantId}'", [
-                'migrate_output' => $migrateOutput,
+                'migrate_fresh_output' => $migrateFreshOutput,
                 'seed_output' => $seedOutput,
             ]);
         } catch (Throwable $e) {
             $this->safeLog('error', "Tenant bootstrap failed for '{$tenantId}': ".$e->getMessage());
             $this->safeLog('error', $e->getTraceAsString());
-            $tenant->delete();
+
+            if (! $isExistingTenant) {
+                $tenant->delete();
+            }
 
             return response()->json([
-                'message' => 'Tenant creation failed during migrate/seed.',
+                'message' => 'Tenant provisioning failed during migrate:fresh + seed.',
                 'error' => $e->getMessage(),
             ], 500);
         }
