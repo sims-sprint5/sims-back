@@ -108,6 +108,7 @@ class TenantController extends Controller
             }
 
             $this->assertTenantInitialized($tenant, $adminEmail);
+            $tenant->update(['admin_password' => null]);
 
             $this->safeLog('info', "Tenant database initialized for '{$tenantId}'", [
                 'migrate_fresh_output' => $migrateFreshOutput,

@@ -4,7 +4,6 @@ namespace Database\Seeders;
 
 use App\Models\Geofence;
 use App\Models\Reservation;
-use App\Models\Tenant;
 use App\Models\Ticket;
 use App\Models\User;
 use App\Models\Vehicle;
@@ -59,9 +58,5 @@ class TenantDatabaseSeeder extends Seeder
         }
 
         Geofence::factory()->count(5)->create();
-
-        // Remove the plain-text password from the tenant record.
-        $currentTenant = Tenant::find(tenant('id'));
-        $currentTenant->update(['admin_password' => null]);
     }
 }

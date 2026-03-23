@@ -98,4 +98,15 @@ return Application::configure(basePath: dirname(__DIR__))
                 return response()->json(['message' => 'Recurso no encontrado.'], 404);
             }
         });
+
+        $exceptions->render(function (Throwable $e, Request $request) {
+            if (! $request->is('api/*')) {
+                return null;
+            }
+
+            return response()->json([
+                'message' => 'Server Error',
+                'error' => app()->environment('production') ? null : $e->getMessage(),
+            ], 500);
+        });
     })->create();
