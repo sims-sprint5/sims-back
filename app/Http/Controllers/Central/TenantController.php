@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Central;
 use App\Http\Controllers\Controller;
 use App\Models\Tenant;
 use App\Models\User;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -53,36 +54,38 @@ class TenantController extends Controller
             ? (string) $request->admin_password
             : $defaultTenantAdminPassword;
 
-        $parsed = parse_url(config('app.url'));
-        $scheme = $parsed['scheme'] ?? 'http';
-        $port = isset($parsed['port']) ? ':'.$parsed['port'] : '';
+        $parsedUrl = parse_url((string) config('app.url', ''));
+        $scheme = is_array($parsedUrl) ? ($parsedUrl['scheme'] ?? 'http') : 'http';
+        $port = is_array($parsedUrl) && isset($parsedUrl['port']) ? ':'.$parsedUrl['port'] : '';
 
         $adminEmail = $request->admin_email ?? "admin@{$tenantId}.{$baseDomain}";
-
-        $tenant = Tenant::query()->find($tenantId);
-        $isExistingTenant = (bool) $tenant;
-
-        if (! $tenant) {
-            $tenant = Tenant::create([
-                'id' => $tenantId,
-                'name' => $request->name,
-                'admin_name' => $request->admin_name ?? 'Admin '.ucfirst($tenantId),
-                'admin_email' => $adminEmail,
-                'admin_password' => $adminPassword,
-            ]);
-        } else {
-            $tenant->update([
-                'name' => $request->name,
-                'admin_name' => $request->admin_name ?? ($tenant->admin_name ?? 'Admin '.ucfirst($tenantId)),
-                'admin_email' => $adminEmail,
-                'admin_password' => $adminPassword,
-            ]);
-        }
-
-        $tenant->domains()->firstOrCreate(['domain' => $tenantId]);
-        $tenant->domains()->firstOrCreate(['domain' => "{$tenantId}.{$baseDomain}"]);
+        $tenant = null;
+        $isExistingTenant = false;
 
         try {
+            $tenant = Tenant::query()->find($tenantId);
+            $isExistingTenant = (bool) $tenant;
+
+            if (! $tenant) {
+                $tenant = Tenant::create([
+                    'id' => $tenantId,
+                    'name' => $request->name,
+                    'admin_name' => $request->admin_name ?? 'Admin '.ucfirst($tenantId),
+                    'admin_email' => $adminEmail,
+                    'admin_password' => $adminPassword,
+                ]);
+            } else {
+                $tenant->update([
+                    'name' => $request->name,
+                    'admin_name' => $request->admin_name ?? ($tenant->admin_name ?? 'Admin '.ucfirst($tenantId)),
+                    'admin_email' => $adminEmail,
+                    'admin_password' => $adminPassword,
+                ]);
+            }
+
+            $tenant->domains()->firstOrCreate(['domain' => $tenantId]);
+            $tenant->domains()->firstOrCreate(['domain' => "{$tenantId}.{$baseDomain}"]);
+
             $this->safeLog('info', "Running tenant migrate:fresh for '{$tenantId}'...");
             $migrateFreshExitCode = Artisan::call('tenants:migrate-fresh', [
                 '--tenants' => [$tenantId],
@@ -114,12 +117,19 @@ class TenantController extends Controller
                 'migrate_fresh_output' => $migrateFreshOutput,
                 'seed_output' => $seedOutput,
             ]);
+        } catch (QueryException $e) {
+            $this->safeLog('error', "Tenant provisioning DB error for '{$tenantId}': ".$e->getMessage());
+
+            return response()->json([
+                'message' => 'Tenant provisioning failed due to a database constraint or connection issue.',
+                'error' => $e->getMessage(),
+            ], 500);
         } catch (Throwable $e) {
             $this->safeLog('error', "Tenant bootstrap failed for '{$tenantId}': ".$e->getMessage());
             $this->safeLog('error', $e->getTraceAsString());
 
             if (! $isExistingTenant) {
-                $tenant->delete();
+                $tenant?->delete();
             }
 
             return response()->json([
