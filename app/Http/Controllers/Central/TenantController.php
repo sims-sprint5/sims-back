@@ -19,7 +19,47 @@ class TenantController extends Controller
 {
     public function index()
     {
-        return response()->json(Tenant::with('domains')->get());
+        $this->safeLog('info', '=== [TENANT LIST] Request started ===');
+
+        if (! $this->isCentralSchemaReady()) {
+            $this->safeLog('error', '[TENANT LIST] Central schema not ready');
+
+            return response()->json([
+                'message' => 'Central database is not initialized. Run central migrations first.',
+            ], 503);
+        }
+
+        try {
+            DB::connection()->getPdo();
+        } catch (Throwable $e) {
+            $this->safeLog('error', '[TENANT LIST] DB connection failed: '.$e->getMessage());
+
+            return response()->json([
+                'message' => 'Central database connection failed. Please verify DB host/credentials.',
+                'error' => app()->environment('production') ? null : $e->getMessage(),
+            ], 503);
+        }
+
+        try {
+            $tenants = Tenant::with('domains')->get();
+            $this->safeLog('info', '[TENANT LIST] ✓ Success');
+
+            return response()->json($tenants);
+        } catch (QueryException $e) {
+            $this->safeLog('error', '[TENANT LIST] DB error: '.$e->getMessage());
+
+            return response()->json([
+                'message' => 'Failed to fetch tenants from central database.',
+                'error' => app()->environment('production') ? null : $e->getMessage(),
+            ], 503);
+        } catch (Throwable $e) {
+            $this->safeLog('error', '[TENANT LIST] Unexpected error: '.$e->getMessage());
+
+            return response()->json([
+                'message' => 'Failed to fetch tenants.',
+                'error' => app()->environment('production') ? null : $e->getMessage(),
+            ], 500);
+        }
     }
 
     public function store(Request $request)
