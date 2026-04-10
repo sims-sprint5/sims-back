@@ -43,6 +43,7 @@ Route::prefix('api')->middleware([
 
         // Vehicles: everyone can view, only Admin can mutate/manage
         Route::apiResource('vehicles', VehicleController::class)->only(['index', 'show']);
+        Route::get('vehicles-calendar', [VehicleController::class, 'allWithCalendar']);
         Route::middleware(['role:Admin,sanctum'])->group(function () {
             Route::apiResource('vehicles', VehicleController::class)->only(['store', 'update', 'destroy']);
             Route::get('vehicles/{id}/reservations', [VehicleController::class, 'reservations']);

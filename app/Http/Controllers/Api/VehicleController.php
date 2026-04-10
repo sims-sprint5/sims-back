@@ -18,6 +18,9 @@ class VehicleController extends Controller
 
     /**
      * Display a listing of the resource.
+     * 
+     * For normal users: ONLY "available" vehicles (map view)
+     * For admin: all vehicles
      */
     public function index(Request $request)
     {
@@ -28,30 +31,9 @@ class VehicleController extends Controller
         $user = $request->user();
         $query = Vehicle::query()->with(['reservations.user']);
 
-        if (! $this->isAdmin($request) && $user) {
-            $userId = (int) $user->user_id;
-
-            // Show vehicles that:
-            // 1. Are available (no active/in-progress reservation)
-            // 2. OR have a reservation (any) for this user
-            // BUT don't show vehicles with an ACTIVE reservation from another user
-            $query->where(function ($vehicleQuery) use ($userId) {
-                $vehicleQuery
-                    ->where('status', 'available')
-                    ->orWhereHas('reservations', function ($reservationQuery) use ($userId) {
-                        // Include reservations from this user (both started and future)
-                        $reservationQuery
-                            ->whereIn('status', ['pending', 'active'])
-                            ->where('user_id', $userId);
-                    });
-            })->whereDoesntHave('reservations', function ($reservationQuery) use ($userId) {
-                // Exclude vehicles with ACTIVE (started) reservations from other users
-                $reservationQuery
-                    ->whereIn('status', ['pending', 'active'])
-                    ->where('start_date', '<=', now())
-                    ->where('end_date', '>', now())
-                    ->where('user_id', '!=', $userId);
-            });
+        if (! $this->isAdmin($request)) {
+            // Normal users ONLY see available vehicles on the map
+            $query->where('status', 'available');
         }
 
         $vehicles = $query->paginate($perPage);
@@ -190,5 +172,56 @@ class VehicleController extends Controller
         ]);
 
         return response()->json($vehicle);
+    }
+
+    /**
+     * Get all vehicles with reservation calendar for the reservations page.
+     * Shows all vehicles (available+reserved) with calendar data.
+     * 
+     * For normal users: no filtering (see all)
+     * For admin: see all
+     */
+    public function allWithCalendar(Request $request)
+    {
+        $availability = app(ReservationAvailabilityService::class);
+        $availability->releaseExpiredReservations();
+
+        $perPage = $request->integer('per_page', 15);
+        $query = Vehicle::query()->with(['reservations' => function ($q) {
+            $q->whereIn('status', ['pending', 'active'])
+              ->orderBy('start_date', 'asc');
+        }]);
+
+        $vehicles = $query->paginate($perPage);
+
+        // Enrich with calendar and prereservation info
+        $vehicles->getCollection()->transform(function (Vehicle $vehicle) use ($availability) {
+            // Get all future reservations for calendar
+            $futureReservations = $vehicle->reservations
+                ->where('end_date', '>', now())
+                ->sortBy('start_date')
+                ->values();
+
+            $vehicle->setAttribute('calendar_reservations', $futureReservations->map(function ($res) {
+                return [
+                    'start_date' => $res->start_date->toIso8601String(),
+                    'end_date' => $res->end_date->toIso8601String(),
+                    'user_name' => $res->user?->name,
+                    'status' => $res->status,
+                ];
+            })->toArray());
+
+            // Get next available slot
+            if ($futureReservations->isNotEmpty()) {
+                $lastReservation = $futureReservations->last();
+                $vehicle->setAttribute('next_available_at', $lastReservation->end_date->toIso8601String());
+            } else {
+                $vehicle->setAttribute('next_available_at', now()->toIso8601String());
+            }
+
+            return $vehicle;
+        });
+
+        return response()->json($vehicles);
     }
 }
