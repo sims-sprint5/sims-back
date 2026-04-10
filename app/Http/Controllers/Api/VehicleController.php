@@ -4,17 +4,70 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Vehicle;
+use App\Services\ReservationAvailabilityService;
 use Illuminate\Http\Request;
 
 class VehicleController extends Controller
 {
+    private function isAdmin(Request $request): bool
+    {
+        $user = $request->user();
+
+        return (bool) ($user?->hasRole('Admin') || strtolower((string) ($user?->role ?? '')) === 'admin');
+    }
+
     /**
      * Display a listing of the resource.
      */
     public function index(Request $request)
     {
+        $availability = app(ReservationAvailabilityService::class);
+        $availability->releaseExpiredReservations();
+
         $perPage = $request->integer('per_page', 15);
-        $vehicles = Vehicle::with(['reservations'])->paginate($perPage);
+        $user = $request->user();
+        $query = Vehicle::query()->with(['reservations.user']);
+
+        if (! $this->isAdmin($request) && $user) {
+            $userId = (int) $user->user_id;
+
+            // Show vehicles that:
+            // 1. Are available (no active/in-progress reservation)
+            // 2. OR have a reservation (any) for this user
+            // BUT don't show vehicles with an ACTIVE reservation from another user
+            $query->where(function ($vehicleQuery) use ($userId) {
+                $vehicleQuery
+                    ->where('status', 'available')
+                    ->orWhereHas('reservations', function ($reservationQuery) use ($userId) {
+                        // Include reservations from this user (both started and future)
+                        $reservationQuery
+                            ->whereIn('status', ['pending', 'active'])
+                            ->where('user_id', $userId);
+                    });
+            })->whereDoesntHave('reservations', function ($reservationQuery) use ($userId) {
+                // Exclude vehicles with ACTIVE (started) reservations from other users
+                $reservationQuery
+                    ->whereIn('status', ['pending', 'active'])
+                    ->where('start_date', '<=', now())
+                    ->where('end_date', '>', now())
+                    ->where('user_id', '!=', $userId);
+            });
+        }
+
+        $vehicles = $query->paginate($perPage);
+
+        // Enrich each vehicle with upcoming reservation info if available
+        $vehicles->getCollection()->transform(function (Vehicle $vehicle) use ($availability) {
+            $nextReservation = $availability->getNextUpcomingReservation((int) $vehicle->vehicle_id);
+            if ($nextReservation) {
+                $vehicle->setAttribute('next_reservation', [
+                    'start_date' => $nextReservation->start_date,
+                    'end_date' => $nextReservation->end_date,
+                    'user_name' => $nextReservation->user?->name,
+                ]);
+            }
+            return $vehicle;
+        });
 
         return response()->json($vehicles);
     }
@@ -43,9 +96,32 @@ class VehicleController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(string $id)
+    public function show(Request $request, string $id)
     {
-        $vehicle = Vehicle::with(['reservations', 'tickets'])->findOrFail($id);
+        $availability = app(ReservationAvailabilityService::class);
+        $availability->releaseExpiredReservations();
+
+        if (! $this->isAdmin($request) && $request->user()) {
+            $userId = (int) $request->user()->user_id;
+            $isBlockedForUser = $availability->vehicleHasActiveReservation((int) $id)
+                && ! $availability->userOwnsActiveReservationForVehicle((int) $id, $userId);
+
+            if ($isBlockedForUser) {
+                return response()->json(['message' => 'Vehicle not available.'], 404);
+            }
+        }
+
+        $vehicle = Vehicle::with(['reservations.user', 'tickets'])->findOrFail($id);
+
+        // Add next upcoming reservation info
+        $nextReservation = $availability->getNextUpcomingReservation((int) $id);
+        if ($nextReservation) {
+            $vehicle->setAttribute('next_reservation', [
+                'start_date' => $nextReservation->start_date,
+                'end_date' => $nextReservation->end_date,
+                'user_name' => $nextReservation->user?->name,
+            ]);
+        }
 
         return response()->json($vehicle);
     }
