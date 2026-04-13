@@ -14,7 +14,6 @@ class TicketController extends Controller
         'low' => 'baixa',
         'medium' => 'mitjana',
         'high' => 'alta',
-        'urgent' => 'alta',
     ];
 
     private const ALLOWED_STATUSES = ['obert', 'en_progres', 'finalitzat'];

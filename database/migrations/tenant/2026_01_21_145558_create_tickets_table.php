@@ -28,7 +28,7 @@ return new class extends Migration
             $table->string('type', 50)->comment('technical, billing, complaint, inquiry');
             $table->string('subject', 255);
             $table->text('description');
-            $table->string('priority', 20)->comment('low, medium, high, urgent');
+            $table->string('priority', 20)->comment('alta, mitjana, baixa');
             $table->string('status', 20)->default('open')->comment('open, in_progress, resolved, closed');
 
             $table->foreignId('assigned_to')
