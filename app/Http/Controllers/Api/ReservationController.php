@@ -211,21 +211,59 @@ class ReservationController extends Controller
         $availability = app(ReservationAvailabilityService::class);
         $availability->releaseExpiredReservations();
 
-        $reservation = Reservation::findOrFail($id);
-        $vehicleId = (int) $reservation->vehicle_id;
-
-        if (! request()->user()) {
+        $user = request()->user();
+        
+        if (! $user) {
             return response()->json(['message' => 'Unauthenticated.'], 401);
         }
 
-        if (! $this->isAdmin(request()) && $reservation->user_id !== request()->user()->user_id) {
-            return response()->json(['message' => 'Forbidden.'], 403);
+        $reservation = Reservation::findOrFail($id);
+        $vehicleId = (int) $reservation->vehicle_id;
+
+        // Check permissions: user can only delete their own reservations, admin can delete any
+        if (! $this->isAdmin(request()) && (int) $reservation->user_id !== (int) $user->user_id) {
+            return response()->json(['message' => 'Forbidden. You cannot delete this reservation.'], 403);
         }
 
-        $reservation->delete();
-        $availability->syncVehicleAvailability($vehicleId);
+        // Check if reservation has already started - cannot cancel active/in-progress reservations
+        if ((string) $reservation->status === 'active' || $reservation->start_date <= now()) {
+            return response()->json([
+                'message' => 'Cannot cancel a reservation that has already started.',
+                'reservation_status' => $reservation->status,
+                'start_date' => $reservation->start_date->toIso8601String(),
+            ], 422);
+        }
 
-        return response()->json(['message' => 'Reservation deleted successfully'], 200);
+        // Check if reservation is already completed
+        if ((string) $reservation->status === 'completed') {
+            return response()->json([
+                'message' => 'Cannot cancel a completed reservation.',
+            ], 422);
+        }
+
+        // Check if reservation is already cancelled
+        if ((string) $reservation->status === 'cancelled') {
+            return response()->json([
+                'message' => 'This reservation is already cancelled.',
+            ], 422);
+        }
+
+        // Delete the reservation
+        $deleted = $reservation->delete();
+
+        if ($deleted) {
+            // Sync vehicle availability after deletion
+            $availability->syncVehicleAvailability($vehicleId);
+            
+            return response()->json([
+                'message' => 'Reservation deleted successfully',
+                'vehicle_id' => $vehicleId,
+            ], 200);
+        }
+
+        return response()->json([
+            'message' => 'Failed to delete reservation',
+        ], 500);
     }
 
     /**

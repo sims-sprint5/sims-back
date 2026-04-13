@@ -82,16 +82,19 @@ class ReservationAvailabilityService
             return;
         }
 
-        if ($this->vehicleHasActiveReservation($vehicleId)) {
-            if ($vehicle->status !== 'reserved') {
+        // Check if there's any ACTIVE reservation (started but not ended)
+        $hasActiveReservation = $this->vehicleHasActiveReservation($vehicleId);
+
+        if ($hasActiveReservation) {
+            // Vehicle is currently in use
+            if ((string) $vehicle->status !== 'reserved') {
                 $vehicle->update(['status' => 'reserved']);
             }
-
-            return;
-        }
-
-        if ($vehicle->status === 'reserved') {
-            $vehicle->update(['status' => 'available']);
+        } else {
+            // No active reservation - vehicle should be available
+            if ((string) $vehicle->status !== 'available' && (string) $vehicle->status !== 'inactive' && (string) $vehicle->status !== 'maintenance') {
+                $vehicle->update(['status' => 'available']);
+            }
         }
     }
 
@@ -136,5 +139,16 @@ class ReservationAvailabilityService
                 'end_date' => $conflictingReservation->end_date->toIso8601String(),
             ],
         ];
+    }
+
+    /**
+     * Sync all vehicles availability status based on their reservations.
+     */
+    public function syncAllVehiclesAvailability(): void
+    {
+        $vehicles = Vehicle::all();
+        foreach ($vehicles as $vehicle) {
+            $this->syncVehicleAvailability((int) $vehicle->vehicle_id);
+        }
     }
 }

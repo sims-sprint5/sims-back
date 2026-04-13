@@ -48,6 +48,7 @@ Route::prefix('api')->middleware([
             Route::apiResource('vehicles', VehicleController::class)->only(['store', 'update', 'destroy']);
             Route::get('vehicles/{id}/reservations', [VehicleController::class, 'reservations']);
             Route::patch('vehicles/{id}/location', [VehicleController::class, 'updateLocation']);
+            Route::post('vehicles/sync-all-availability', [VehicleController::class, 'syncAllAvailability']);
         });
 
         // Reservations: both roles can use resource endpoints, but Usuario is scoped to own reservations in controller

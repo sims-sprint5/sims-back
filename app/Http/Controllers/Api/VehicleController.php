@@ -224,4 +224,26 @@ class VehicleController extends Controller
 
         return response()->json($vehicles);
     }
+
+    /**
+     * Sync all vehicles availability (admin only - for maintenance/debug).
+     */
+    public function syncAllAvailability(Request $request)
+    {
+        if (! $this->isAdmin($request)) {
+            return response()->json(['message' => 'Forbidden.'], 403);
+        }
+
+        $availability = app(ReservationAvailabilityService::class);
+        
+        // First release expired reservations
+        $availability->releaseExpiredReservations();
+        
+        // Then sync all vehicles
+        $availability->syncAllVehiclesAvailability();
+
+        return response()->json([
+            'message' => 'All vehicles synchronized successfully',
+        ], 200);
+    }
 }
