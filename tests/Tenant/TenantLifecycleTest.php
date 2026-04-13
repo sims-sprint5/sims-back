@@ -281,18 +281,50 @@ class TenantLifecycleTest extends TestCase
             ->assertStatus(200)
             ->json('data.access_token');
 
-        // Create a ticket as this user.
+        // Create a ticket as this user. Priority sent by user must be ignored.
         $ticketResponse = $this->withToken($userToken)
             ->postJson("http://{$this->tenantId}.lvh.me/api/v1/tickets", [
                 'type' => 'technical',
                 'subject' => 'No funciona',
                 'description' => 'Detalle del problema',
-                'priority' => 'medium',
+                'priority' => 'alta',
             ]);
 
-        $ticketResponse->assertStatus(201);
+        $ticketResponse->assertStatus(201)
+            ->assertJsonPath('status', 'obert')
+            ->assertJsonMissingPath('priority');
         $ticketId = (string) $ticketResponse->json('ticket_id');
         $this->assertNotEmpty($ticketId);
+
+        // Admin can see and modify priority/status.
+        $adminToken = $this->postJson("http://{$this->tenantId}.lvh.me/api/v1/auth/login", [
+            'email' => $this->adminEmail,
+            'password' => $this->adminPassword,
+        ])
+            ->assertStatus(200)
+            ->json('data.access_token');
+
+        $this->withToken($adminToken)
+            ->getJson("http://{$this->tenantId}.lvh.me/api/v1/tickets/{$ticketId}")
+            ->assertStatus(200)
+            ->assertJsonPath('priority', 'baixa')
+            ->assertJsonPath('status', 'obert');
+
+        $this->withToken($adminToken)
+            ->patchJson("http://{$this->tenantId}.lvh.me/api/v1/tickets/{$ticketId}", [
+                'priority' => 'baixa',
+                'status' => 'en_progres',
+            ])
+            ->assertStatus(200)
+            ->assertJsonPath('priority', 'baixa')
+            ->assertJsonPath('status', 'en_progres');
+
+        // User can always see status, but never priority.
+        $this->withToken($userToken)
+            ->getJson("http://{$this->tenantId}.lvh.me/api/v1/tickets/{$ticketId}")
+            ->assertStatus(200)
+            ->assertJsonPath('status', 'en_progres')
+            ->assertJsonMissingPath('priority');
 
         // Send a message.
         $messageText = 'Hola soporte, tengo una duda.';

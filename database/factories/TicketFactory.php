@@ -17,8 +17,8 @@ class TicketFactory extends Factory
             'type' => fake()->randomElement(['technical', 'billing', 'complaint', 'inquiry']),
             'subject' => fake()->sentence(3),
             'description' => fake()->paragraph(),
-            'priority' => fake()->randomElement(['low', 'medium', 'high', 'urgent']),
-            'status' => fake()->randomElement(['open', 'in_progress', 'resolved', 'closed']),
+            'priority' => fake()->randomElement(['alta', 'mitjana', 'baixa']),
+            'status' => fake()->randomElement(['obert', 'en_progres', 'finalitzat']),
             'assigned_to' => null,
         ];
     }
