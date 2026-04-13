@@ -43,15 +43,19 @@ Route::prefix('api')->middleware([
 
         // Vehicles: everyone can view, only Admin can mutate/manage
         Route::apiResource('vehicles', VehicleController::class)->only(['index', 'show']);
+        Route::get('vehicles-calendar', [VehicleController::class, 'allWithCalendar']);
         Route::middleware(['role:Admin,sanctum'])->group(function () {
             Route::apiResource('vehicles', VehicleController::class)->only(['store', 'update', 'destroy']);
             Route::get('vehicles/{id}/reservations', [VehicleController::class, 'reservations']);
             Route::patch('vehicles/{id}/location', [VehicleController::class, 'updateLocation']);
+            Route::post('vehicles/sync-all-availability', [VehicleController::class, 'syncAllAvailability']);
         });
 
         // Reservations: both roles can use resource endpoints, but Usuario is scoped to own reservations in controller
         Route::get('reservations/user/{userId}', [ReservationController::class, 'byUser']);
+        Route::get('reservations/check-availability', [ReservationController::class, 'checkAvailability']);
         Route::apiResource('reservations', ReservationController::class);
+        Route::post('reservations/{id}/renewal-intent', [ReservationController::class, 'renewalIntent']);
         Route::middleware(['role:Admin,sanctum'])->group(function () {
             Route::patch('reservations/{id}/status', [ReservationController::class, 'updateStatus']);
         });
