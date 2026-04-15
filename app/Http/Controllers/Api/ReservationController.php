@@ -205,6 +205,9 @@ class ReservationController extends Controller
 
     /**
      * Remove the specified resource from storage.
+     * 
+     * Admin: Can delete any reservation at any time (soft delete)
+     * Users: Can only delete pending reservations that haven't started yet
      */
     public function destroy(string $id)
     {
@@ -225,39 +228,47 @@ class ReservationController extends Controller
             return response()->json(['message' => 'Forbidden. You cannot delete this reservation.'], 403);
         }
 
-        // Check if reservation has already started - cannot cancel active/in-progress reservations
-        if ((string) $reservation->status === 'active' || $reservation->start_date <= now()) {
-            return response()->json([
-                'message' => 'Cannot cancel a reservation that has already started.',
-                'reservation_status' => $reservation->status,
-                'start_date' => $reservation->start_date->toIso8601String(),
-            ], 422);
-        }
+        // Non-admin users have restrictions
+        if (! $this->isAdmin(request())) {
+            // Check if reservation has already started - cannot cancel active/in-progress reservations
+            if ((string) $reservation->status === 'active' || $reservation->start_date <= now()) {
+                return response()->json([
+                    'message' => 'Cannot cancel a reservation that has already started.',
+                    'reservation_status' => $reservation->status,
+                    'start_date' => $reservation->start_date->toIso8601String(),
+                ], 422);
+            }
 
-        // Check if reservation is already completed
-        if ((string) $reservation->status === 'completed') {
-            return response()->json([
-                'message' => 'Cannot cancel a completed reservation.',
-            ], 422);
-        }
+            // Check if reservation is already completed
+            if ((string) $reservation->status === 'completed') {
+                return response()->json([
+                    'message' => 'Cannot cancel a completed reservation.',
+                ], 422);
+            }
 
-        // Check if reservation is already cancelled
-        if ((string) $reservation->status === 'cancelled') {
-            return response()->json([
-                'message' => 'This reservation is already cancelled.',
-            ], 422);
+            // Check if reservation is already cancelled
+            if ((string) $reservation->status === 'cancelled') {
+                return response()->json([
+                    'message' => 'This reservation is already cancelled.',
+                ], 422);
+            }
         }
+        // Admin can delete any reservation (no restrictions)
 
-        // Delete the reservation
+        // Delete the reservation (soft delete)
         $deleted = $reservation->delete();
 
         if ($deleted) {
             // Sync vehicle availability after deletion
             $availability->syncVehicleAvailability($vehicleId);
             
+            $userRole = $this->isAdmin(request()) ? 'admin' : 'user';
+            
             return response()->json([
                 'message' => 'Reservation deleted successfully',
                 'vehicle_id' => $vehicleId,
+                'deleted_by' => $userRole,
+                'deleted_at' => $reservation->deleted_at->toIso8601String(),
             ], 200);
         }
 
