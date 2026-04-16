@@ -56,7 +56,7 @@ class ReservationController extends Controller
             'end_date' => 'required|date|after:start_date',
             'pickup_location' => 'nullable|string|max:255',
             'dropoff_location' => 'nullable|string|max:255',
-            'status' => 'nullable|string|in:pending,active,completed,cancelled',
+            'status' => 'nullable|string|in:pending,paid,active,completed,cancelled',
             'total_cost' => 'nullable|numeric|min:0',
         ]);
 
@@ -152,7 +152,7 @@ class ReservationController extends Controller
             'end_date' => 'sometimes|date|after:start_date',
             'pickup_location' => 'nullable|string|max:255',
             'dropoff_location' => 'nullable|string|max:255',
-            'status' => 'sometimes|string|in:pending,active,completed,cancelled',
+            'status' => 'sometimes|string|in:pending,paid,active,completed,cancelled',
             'total_cost' => 'nullable|numeric|min:0',
         ]);
 
@@ -177,7 +177,7 @@ class ReservationController extends Controller
                 $targetVehicleId,
                 $startDate,
                 $endDate,
-                (int) $reservation->reservation_id
+                (int) $reservation->getKey()
             );
 
             if (! $availabilityCheck['available']) {
@@ -306,7 +306,7 @@ class ReservationController extends Controller
         $reservation = Reservation::findOrFail($id);
 
         $validated = $request->validate([
-            'status' => 'required|string|in:pending,active,completed,cancelled',
+            'status' => 'required|string|in:pending,paid,active,completed,cancelled',
         ]);
 
         $reservation->update($validated);
@@ -328,8 +328,8 @@ class ReservationController extends Controller
 
         return response()->json([
             'message' => 'Renewal requires payment flow integration.',
-            'reservation_id' => $reservation->reservation_id,
-            'payment_url' => "/payments/reservations/{$reservation->reservation_id}/renew",
+            'reservation_id' => $reservation->getKey(),
+            'payment_url' => '/payments/reservations/'.$reservation->getKey().'/renew',
         ]);
     }
 
@@ -377,7 +377,7 @@ class ReservationController extends Controller
         $reservation->setAttribute('is_expired', $isExpired);
         $reservation->setAttribute('minutes_remaining', $minutesRemaining);
         $reservation->setAttribute('can_renew', $isActiveWindow);
-        $reservation->setAttribute('renewal_payment_url', $isActiveWindow ? "/payments/reservations/{$reservation->reservation_id}/renew" : null);
+        $reservation->setAttribute('renewal_payment_url', $isActiveWindow ? '/payments/reservations/'.$reservation->getKey().'/renew' : null);
         $reservation->setAttribute('renewal_notice', $isExpiringSoon ? 'Tu reserva está por finalizar. Puedes ampliar el tiempo desde la pasarela de pago.' : null);
 
         return $reservation;

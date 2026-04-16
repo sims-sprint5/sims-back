@@ -7,7 +7,7 @@ use App\Models\Vehicle;
 
 class ReservationAvailabilityService
 {
-    private array $activeStatuses = ['pending', 'active'];
+    private array $activeStatuses = ['pending', 'paid', 'active'];
 
     public function releaseExpiredReservations(): void
     {
@@ -23,6 +23,7 @@ class ReservationAvailabilityService
         $vehicleIds = [];
 
         foreach ($expiredReservations as $reservation) {
+            /** @var Reservation $reservation */
             $vehicleIds[] = (int) $reservation->vehicle_id;
 
             if ($reservation->status !== 'completed') {
