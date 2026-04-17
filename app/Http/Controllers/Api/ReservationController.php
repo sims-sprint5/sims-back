@@ -132,6 +132,9 @@ class ReservationController extends Controller
 
     /**
      * Update the specified resource in storage.
+     * 
+     * Users can only modify: end_date, pickup_location, dropoff_location
+     * Admin can modify: all fields
      */
     public function update(Request $request, string $id)
     {
@@ -156,16 +159,23 @@ class ReservationController extends Controller
             'total_cost' => 'nullable|numeric|min:0',
         ]);
 
+        // Non-admin users: restrict what they can modify
         if (! $this->isAdmin($request)) {
-            unset($validated['user_id'], $validated['status']);
+            // Users can only modify: end_date, pickup_location, dropoff_location
+            $allowed = ['end_date', 'pickup_location', 'dropoff_location'];
+            foreach ($validated as $key => $value) {
+                if (! in_array($key, $allowed, true)) {
+                    unset($validated[$key]);
+                }
+            }
         }
 
         $targetVehicleId = (int) ($validated['vehicle_id'] ?? $reservation->vehicle_id);
         $startDate = isset($validated['start_date']) 
-            ? new \DateTime($validated['start_date'])
+            ? $validated['start_date']
             : $reservation->start_date;
         $endDate = isset($validated['end_date']) 
-            ? new \DateTime($validated['end_date'])
+            ? $validated['end_date']
             : $reservation->end_date;
 
         // Check availability for the requested period if vehicle or dates changed
@@ -351,6 +361,7 @@ class ReservationController extends Controller
      * - vehicle_id: ID del vehículo (requerido)
      * - start_date: Fecha/hora de inicio (requerido)
      * - end_date: Fecha/hora de fin (requerido)
+     * - exclude_reservation_id: ID de reserva a ignorar (opcional, para extender reservas existentes)
      * 
      * Response: {available: bool, message?: string, available_at?: string, ...}
      */
@@ -362,14 +373,21 @@ class ReservationController extends Controller
             'vehicle_id' => 'required|integer|exists:vehicles,vehicle_id',
             'start_date' => 'required|date',
             'end_date' => 'required|date|after:start_date',
+            'exclude_reservation_id' => 'nullable|integer|exists:reservations,reservation_id',
         ]);
 
         $vehicleId = $request->integer('vehicle_id');
-        $startDate = new \DateTime($request->string('start_date'));
-        $endDate = new \DateTime($request->string('end_date'));
+        $startDate = $request->string('start_date');
+        $endDate = $request->string('end_date');
+        $excludeReservationId = $request->integer('exclude_reservation_id');
 
         $availability = app(ReservationAvailabilityService::class);
-        $result = $availability->checkAvailabilityForPeriod($vehicleId, $startDate, $endDate);
+        $result = $availability->checkAvailabilityForPeriod(
+            $vehicleId,
+            $startDate,
+            $endDate,
+            $excludeReservationId
+        );
 
         return response()->json($result);
     }
