@@ -101,7 +101,7 @@ class ReservationAvailabilityService
 
     /**
      * Check if a vehicle is available for a specific date/time period.
-     * 
+     *
      * Returns:
      * - ['available' => true] if no conflicts
      * - ['available' => false, 'message' => '...', 'available_at' => '...'] if there's a conflict

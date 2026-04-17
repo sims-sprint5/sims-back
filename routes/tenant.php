@@ -34,7 +34,7 @@ Route::prefix('api')->middleware([
             Route::post('change-password', [AuthController::class, 'changePassword']);
         });
     });
- 
+
     Route::middleware(['auth:sanctum', 'ensure.tenant'])->prefix('v1')->group(function () {
         // Admin-only: user management
         Route::middleware(['role:Admin,sanctum'])->group(function () {
