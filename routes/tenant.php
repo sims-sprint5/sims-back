@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\ChatController;
 use App\Http\Controllers\Api\GeofenceController;
 use App\Http\Controllers\Api\ReservationController;
 use App\Http\Controllers\Api\TicketController;
@@ -81,5 +82,8 @@ Route::prefix('api')->middleware([
             Route::get('geofences/{id}/logs', [GeofenceController::class, 'logs']);
             Route::post('geofences/check-vehicle', [GeofenceController::class, 'checkVehicle']);
         });
+
+        // Chat: everyone authenticated can use the chatbot
+        Route::post('chat/ask', [ChatController::class, 'ask']);
     });
 });
