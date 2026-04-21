@@ -80,7 +80,7 @@ PROMPT;
             if ($response->failed()) {
                 $errorMsg = $response->json('error.message') ?? $response->body();
                 \Log::error('Groq API failed: '.$response->status().' - '.$errorMsg);
-                
+
                 return response()->json([
                     'error' => 'Error al conectar con Groq: '.$errorMsg,
                     'status' => $response->status(),
