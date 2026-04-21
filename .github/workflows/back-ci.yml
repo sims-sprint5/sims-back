@@ -20,7 +20,9 @@ jobs:
             "DB_PASSWORD=postgres" \
             "DB_DATABASE=sims_test" \
             "DB_PORT=5432" \
-            "APP_ENV=testing" > .env.ci
+            "APP_ENV=testing" \
+            "UID=0" \
+            "GID=0" > .env.ci
 
       - name: Build Docker image
         run: docker compose --env-file .env.ci build api
@@ -39,6 +41,9 @@ jobs:
             echo "PostgreSQL timeout reached"
             exit 1
           '
+
+      - name: Fix git safe.directory
+        run: docker compose --env-file .env.ci run --rm api git config --global --add safe.directory /var/www/html
 
       - name: Install dependencies
         run: docker compose --env-file .env.ci run --rm api composer install --prefer-dist --no-interaction --no-progress
