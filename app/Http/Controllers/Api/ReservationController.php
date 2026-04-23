@@ -7,6 +7,7 @@ use App\Models\Reservation;
 use App\Models\Vehicle;
 use App\Services\ReservationAvailabilityService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class ReservationController extends Controller
 {
@@ -53,10 +54,10 @@ class ReservationController extends Controller
             'user_id' => 'nullable|exists:users,user_id',
             'vehicle_id' => 'required|exists:vehicles,vehicle_id',
             'start_date' => 'required|date',
-            'end_date' => 'required|date|after:start_date',
+            'end_date' => 'required|date|after_or_equal:start_date',
             'pickup_location' => 'nullable|string|max:255',
             'dropoff_location' => 'nullable|string|max:255',
-            'status' => 'nullable|string|in:pending,active,completed,cancelled',
+            'status' => 'nullable|string|in:pending,paid,active,completed,cancelled',
             'total_cost' => 'nullable|numeric|min:0',
         ]);
 
@@ -76,22 +77,24 @@ class ReservationController extends Controller
             return response()->json(['message' => 'Vehicle is not available for reservation.'], 422);
         }
 
-        // Check for availability in the requested period
+        // Check for availability in the requested period using raw SQL overlap check
         $startDate = new \DateTime($validated['start_date']);
         $endDate = new \DateTime($validated['end_date']);
 
-        $availabilityCheck = $availability->checkAvailabilityForPeriod(
-            (int) $vehicle->vehicle_id,
-            $startDate,
-            $endDate
+        $conflicting = DB::select(
+            'SELECT * FROM reservations WHERE vehicle_id = ? AND (start_date <= ? AND end_date >= ?) AND status IN (?, ?, ?)',
+            [
+                $vehicle->vehicle_id,
+                $endDate->format('Y-m-d'),
+                $startDate->format('Y-m-d'),
+                'pending',
+                'paid',
+                'active',
+            ]
         );
 
-        if (! $availabilityCheck['available']) {
-            return response()->json([
-                'message' => $availabilityCheck['message'],
-                'available_at' => $availabilityCheck['available_at'] ?? null,
-                'conflicting_reservation' => $availabilityCheck['conflicting_reservation'] ?? null,
-            ], 409);
+        if (! empty($conflicting)) {
+            return response()->json(['message' => 'Cotxe no disponible'], 409);
         }
 
         if (empty($validated['status'])) {
@@ -105,7 +108,8 @@ class ReservationController extends Controller
         $noticeMinutes = max(1, (int) env('RESERVATION_RENEWAL_NOTICE_MINUTES', 15));
         $reservation = $this->addRenewalMeta($reservation, $noticeMinutes);
 
-        return response()->json($reservation->load(['user', 'vehicle']), 201);
+        return response()->json($reservation->load(['user', 'vehicle']), 201)
+            ->header('Cache-Control', 'no-store, no-cache, must-revalidate');
     }
 
     /**
@@ -152,10 +156,10 @@ class ReservationController extends Controller
             'user_id' => 'sometimes|exists:users,user_id',
             'vehicle_id' => 'sometimes|exists:vehicles,vehicle_id',
             'start_date' => 'sometimes|date',
-            'end_date' => 'sometimes|date|after:start_date',
+            'end_date' => 'sometimes|date',
             'pickup_location' => 'nullable|string|max:255',
             'dropoff_location' => 'nullable|string|max:255',
-            'status' => 'sometimes|string|in:pending,active,completed,cancelled',
+            'status' => 'sometimes|string|in:pending,paid,active,completed,cancelled',
             'total_cost' => 'nullable|numeric|min:0',
         ]);
 
@@ -178,6 +182,12 @@ class ReservationController extends Controller
             ? $validated['end_date']
             : $reservation->end_date;
 
+        if ($endDate < $startDate) {
+            return response()->json([
+                'message' => 'end_date must be after or equal to start_date.',
+            ], 422);
+        }
+
         // Check availability for the requested period if vehicle or dates changed
         if ($targetVehicleId !== $originalVehicleId ||
             isset($validated['start_date']) ||
@@ -187,7 +197,7 @@ class ReservationController extends Controller
                 $targetVehicleId,
                 $startDate,
                 $endDate,
-                (int) $reservation->reservation_id
+                (int) $reservation->getKey()
             );
 
             if (! $availabilityCheck['available']) {
@@ -327,7 +337,7 @@ class ReservationController extends Controller
         $reservation = Reservation::findOrFail($id);
 
         $validated = $request->validate([
-            'status' => 'required|string|in:pending,active,completed,cancelled',
+            'status' => 'required|string|in:pending,paid,active,completed,cancelled',
         ]);
 
         $reservation->update($validated);
@@ -349,8 +359,8 @@ class ReservationController extends Controller
 
         return response()->json([
             'message' => 'Renewal requires payment flow integration.',
-            'reservation_id' => $reservation->reservation_id,
-            'payment_url' => "/payments/reservations/{$reservation->reservation_id}/renew",
+            'reservation_id' => $reservation->getKey(),
+            'payment_url' => '/payments/reservations/'.$reservation->getKey().'/renew',
         ]);
     }
 
@@ -372,8 +382,7 @@ class ReservationController extends Controller
         $request->validate([
             'vehicle_id' => 'required|integer|exists:vehicles,vehicle_id',
             'start_date' => 'required|date',
-            'end_date' => 'required|date|after:start_date',
-            'exclude_reservation_id' => 'nullable|integer|exists:reservations,reservation_id',
+            'end_date' => 'required|date|after_or_equal:start_date',
         ]);
 
         $vehicleId = $request->integer('vehicle_id');
@@ -406,7 +415,7 @@ class ReservationController extends Controller
         $reservation->setAttribute('is_expired', $isExpired);
         $reservation->setAttribute('minutes_remaining', $minutesRemaining);
         $reservation->setAttribute('can_renew', $isActiveWindow);
-        $reservation->setAttribute('renewal_payment_url', $isActiveWindow ? "/payments/reservations/{$reservation->reservation_id}/renew" : null);
+        $reservation->setAttribute('renewal_payment_url', $isActiveWindow ? '/payments/reservations/'.$reservation->getKey().'/renew' : null);
         $reservation->setAttribute('renewal_notice', $isExpiringSoon ? 'Tu reserva está por finalizar. Puedes ampliar el tiempo desde la pasarela de pago.' : null);
 
         return $reservation;
