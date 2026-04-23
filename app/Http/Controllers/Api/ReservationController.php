@@ -136,6 +136,9 @@ class ReservationController extends Controller
 
     /**
      * Update the specified resource in storage.
+     *
+     * Users can only modify: end_date, pickup_location, dropoff_location
+     * Admin can modify: all fields
      */
     public function update(Request $request, string $id)
     {
@@ -160,16 +163,23 @@ class ReservationController extends Controller
             'total_cost' => 'nullable|numeric|min:0',
         ]);
 
+        // Non-admin users: restrict what they can modify
         if (! $this->isAdmin($request)) {
-            unset($validated['user_id'], $validated['status']);
+            // Users can only modify: end_date, pickup_location, dropoff_location
+            $allowed = ['end_date', 'pickup_location', 'dropoff_location'];
+            foreach ($validated as $key => $value) {
+                if (! in_array($key, $allowed, true)) {
+                    unset($validated[$key]);
+                }
+            }
         }
 
         $targetVehicleId = (int) ($validated['vehicle_id'] ?? $reservation->vehicle_id);
-        $startDate = isset($validated['start_date']) 
-            ? new \DateTime($validated['start_date'])
+        $startDate = isset($validated['start_date'])
+            ? $validated['start_date']
             : $reservation->start_date;
-        $endDate = isset($validated['end_date']) 
-            ? new \DateTime($validated['end_date'])
+        $endDate = isset($validated['end_date'])
+            ? $validated['end_date']
             : $reservation->end_date;
 
         if ($endDate < $startDate) {
@@ -179,10 +189,10 @@ class ReservationController extends Controller
         }
 
         // Check availability for the requested period if vehicle or dates changed
-        if ($targetVehicleId !== $originalVehicleId || 
-            isset($validated['start_date']) || 
+        if ($targetVehicleId !== $originalVehicleId ||
+            isset($validated['start_date']) ||
             isset($validated['end_date'])) {
-            
+
             $availabilityCheck = $availability->checkAvailabilityForPeriod(
                 $targetVehicleId,
                 $startDate,
@@ -215,6 +225,9 @@ class ReservationController extends Controller
 
     /**
      * Remove the specified resource from storage.
+     *
+     * Admin: Can delete any reservation at any time (soft delete)
+     * Users: Can only delete pending reservations that haven't started yet
      */
     public function destroy(string $id)
     {
@@ -222,7 +235,7 @@ class ReservationController extends Controller
         $availability->releaseExpiredReservations();
 
         $user = request()->user();
-        
+
         if (! $user) {
             return response()->json(['message' => 'Unauthenticated.'], 401);
         }
@@ -235,39 +248,47 @@ class ReservationController extends Controller
             return response()->json(['message' => 'Forbidden. You cannot delete this reservation.'], 403);
         }
 
-        // Check if reservation has already started - cannot cancel active/in-progress reservations
-        if ((string) $reservation->status === 'active' || $reservation->start_date <= now()) {
-            return response()->json([
-                'message' => 'Cannot cancel a reservation that has already started.',
-                'reservation_status' => $reservation->status,
-                'start_date' => $reservation->start_date->toIso8601String(),
-            ], 422);
-        }
+        // Non-admin users have restrictions
+        if (! $this->isAdmin(request())) {
+            // Check if reservation has already started - cannot cancel active/in-progress reservations
+            if ((string) $reservation->status === 'active' || $reservation->start_date <= now()) {
+                return response()->json([
+                    'message' => 'Cannot cancel a reservation that has already started.',
+                    'reservation_status' => $reservation->status,
+                    'start_date' => $reservation->start_date->toIso8601String(),
+                ], 422);
+            }
 
-        // Check if reservation is already completed
-        if ((string) $reservation->status === 'completed') {
-            return response()->json([
-                'message' => 'Cannot cancel a completed reservation.',
-            ], 422);
-        }
+            // Check if reservation is already completed
+            if ((string) $reservation->status === 'completed') {
+                return response()->json([
+                    'message' => 'Cannot cancel a completed reservation.',
+                ], 422);
+            }
 
-        // Check if reservation is already cancelled
-        if ((string) $reservation->status === 'cancelled') {
-            return response()->json([
-                'message' => 'This reservation is already cancelled.',
-            ], 422);
+            // Check if reservation is already cancelled
+            if ((string) $reservation->status === 'cancelled') {
+                return response()->json([
+                    'message' => 'This reservation is already cancelled.',
+                ], 422);
+            }
         }
+        // Admin can delete any reservation (no restrictions)
 
-        // Delete the reservation
+        // Delete the reservation (soft delete)
         $deleted = $reservation->delete();
 
         if ($deleted) {
             // Sync vehicle availability after deletion
             $availability->syncVehicleAvailability($vehicleId);
-            
+
+            $userRole = $this->isAdmin(request()) ? 'admin' : 'user';
+
             return response()->json([
                 'message' => 'Reservation deleted successfully',
                 'vehicle_id' => $vehicleId,
+                'deleted_by' => $userRole,
+                'deleted_at' => $reservation->deleted_at->toIso8601String(),
             ], 200);
         }
 
@@ -345,12 +366,13 @@ class ReservationController extends Controller
 
     /**
      * Check vehicle availability for a specific date/time period.
-     * 
+     *
      * Query params:
      * - vehicle_id: ID del vehículo (requerido)
      * - start_date: Fecha/hora de inicio (requerido)
      * - end_date: Fecha/hora de fin (requerido)
-     * 
+     * - exclude_reservation_id: ID de reserva a ignorar (opcional, para extender reservas existentes)
+     *
      * Response: {available: bool, message?: string, available_at?: string, ...}
      */
     public function checkAvailability(Request $request)
@@ -364,11 +386,17 @@ class ReservationController extends Controller
         ]);
 
         $vehicleId = $request->integer('vehicle_id');
-        $startDate = new \DateTime($request->string('start_date'));
-        $endDate = new \DateTime($request->string('end_date'));
+        $startDate = $request->string('start_date');
+        $endDate = $request->string('end_date');
+        $excludeReservationId = $request->integer('exclude_reservation_id');
 
         $availability = app(ReservationAvailabilityService::class);
-        $result = $availability->checkAvailabilityForPeriod($vehicleId, $startDate, $endDate);
+        $result = $availability->checkAvailabilityForPeriod(
+            $vehicleId,
+            $startDate,
+            $endDate,
+            $excludeReservationId
+        );
 
         return response()->json($result);
     }

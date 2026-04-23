@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Services\ReservationAvailabilityService;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
  * @property int $reservation_id
@@ -21,7 +22,7 @@ use Illuminate\Database\Eloquent\Model;
  */
 class Reservation extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     protected static function booted(): void
     {

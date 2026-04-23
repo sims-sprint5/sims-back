@@ -18,7 +18,7 @@ class VehicleController extends Controller
 
     /**
      * Display a listing of the resource.
-     * 
+     *
      * For normal users: ONLY "available" vehicles (map view)
      * For admin: all vehicles
      */
@@ -48,6 +48,7 @@ class VehicleController extends Controller
                     'user_name' => $nextReservation->user?->name,
                 ]);
             }
+
             return $vehicle;
         });
 
@@ -177,7 +178,7 @@ class VehicleController extends Controller
     /**
      * Get all vehicles with reservation calendar for the reservations page.
      * Shows all vehicles (available+reserved) with calendar data.
-     * 
+     *
      * For normal users: no filtering (see all)
      * For admin: see all
      */
@@ -195,7 +196,7 @@ class VehicleController extends Controller
         $vehicles = $query->paginate($perPage);
 
         // Enrich with calendar and prereservation info
-        $vehicles->getCollection()->transform(function (Vehicle $vehicle) use ($availability) {
+        $vehicles->getCollection()->transform(function (Vehicle $vehicle) {
             // Get all future reservations for calendar
             $futureReservations = $vehicle->reservations
                 ->where('end_date', '>=', now()->startOfDay())
@@ -273,10 +274,10 @@ class VehicleController extends Controller
         }
 
         $availability = app(ReservationAvailabilityService::class);
-        
+
         // First release expired reservations
         $availability->releaseExpiredReservations();
-        
+
         // Then sync all vehicles
         $availability->syncAllVehiclesAvailability();
 

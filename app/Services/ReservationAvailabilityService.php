@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Reservation;
 use App\Models\Vehicle;
+use Carbon\Carbon;
 
 class ReservationAvailabilityService
 {
@@ -101,17 +102,21 @@ class ReservationAvailabilityService
 
     /**
      * Check if a vehicle is available for a specific date/time period.
-     * 
+     *
      * Returns:
      * - ['available' => true] if no conflicts
      * - ['available' => false, 'message' => '...', 'available_at' => '...'] if there's a conflict
      */
     public function checkAvailabilityForPeriod(
         int $vehicleId,
-        \DateTime $startDate,
-        \DateTime $endDate,
+        mixed $startDate,
+        mixed $endDate,
         ?int $exceptReservationId = null
     ): array {
+        // Ensure dates are Carbon instances for proper comparison
+        $startDate = $startDate instanceof Carbon ? $startDate : Carbon::parse($startDate);
+        $endDate = $endDate instanceof Carbon ? $endDate : Carbon::parse($endDate);
+
         // Look for any reservations that overlap with the requested period
         $conflictingReservation = Reservation::query()
             ->where('vehicle_id', $vehicleId)
