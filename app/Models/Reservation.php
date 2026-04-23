@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\ReservationAvailabilityService;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -21,6 +22,25 @@ use Illuminate\Database\Eloquent\Model;
 class Reservation extends Model
 {
     use HasFactory;
+
+    protected static function booted(): void
+    {
+        static::saved(function (Reservation $reservation): void {
+            $availability = app(ReservationAvailabilityService::class);
+            $availability->syncVehicleAvailability((int) $reservation->vehicle_id);
+
+            if ($reservation->wasChanged('vehicle_id')) {
+                $originalVehicleId = (int) $reservation->getOriginal('vehicle_id');
+                if ($originalVehicleId > 0 && $originalVehicleId !== (int) $reservation->vehicle_id) {
+                    $availability->syncVehicleAvailability($originalVehicleId);
+                }
+            }
+        });
+
+        static::deleted(function (Reservation $reservation): void {
+            app(ReservationAvailabilityService::class)->syncVehicleAvailability((int) $reservation->vehicle_id);
+        });
+    }
 
     protected $table = 'reservations';
 

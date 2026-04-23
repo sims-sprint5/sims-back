@@ -188,8 +188,8 @@ class VehicleController extends Controller
 
         $perPage = $request->integer('per_page', 15);
         $query = Vehicle::query()->with(['reservations' => function ($q) {
-            $q->whereIn('status', ['pending', 'active'])
-              ->orderBy('start_date', 'asc');
+            $q->whereIn('status', ['pending', 'paid', 'active'])
+                ->orderBy('start_date', 'asc');
         }]);
 
         $vehicles = $query->paginate($perPage);
@@ -198,9 +198,20 @@ class VehicleController extends Controller
         $vehicles->getCollection()->transform(function (Vehicle $vehicle) use ($availability) {
             // Get all future reservations for calendar
             $futureReservations = $vehicle->reservations
-                ->where('end_date', '>', now())
+                ->where('end_date', '>=', now()->startOfDay())
                 ->sortBy('start_date')
                 ->values();
+
+            $blockedDates = [];
+            foreach ($futureReservations as $res) {
+                $current = $res->start_date->copy()->startOfDay();
+                $last = $res->end_date->copy()->startOfDay();
+
+                while ($current->lte($last)) {
+                    $blockedDates[$current->toDateString()] = true;
+                    $current->addDay();
+                }
+            }
 
             $vehicle->setAttribute('calendar_reservations', $futureReservations->map(function ($res) {
                 return [
@@ -208,8 +219,11 @@ class VehicleController extends Controller
                     'end_date' => $res->end_date->toIso8601String(),
                     'user_name' => $res->user?->name,
                     'status' => $res->status,
+                    'calendar_state' => 'occupied',
                 ];
             })->toArray());
+
+            $vehicle->setAttribute('blocked_dates', array_keys($blockedDates));
 
             // Get next available slot
             if ($futureReservations->isNotEmpty()) {
@@ -223,6 +237,30 @@ class VehicleController extends Controller
         });
 
         return response()->json($vehicles);
+    }
+
+    /**
+     * Get availability calendar for a specific vehicle.
+     * Returns JSON array of {start, end, status}
+     */
+    public function disponibilitat(string $id)
+    {
+        $vehicle = Vehicle::findOrFail($id);
+
+        $reservations = $vehicle->reservations()
+            ->whereIn('status', ['pending', 'paid', 'active'])
+            ->orderBy('start_date', 'asc')
+            ->get();
+
+        $data = $reservations->map(function ($res) {
+            return [
+                'start' => $res->start_date->format('Y-m-d'),
+                'end' => $res->end_date->format('Y-m-d'),
+                'status' => 'reservat',
+            ];
+        })->toArray();
+
+        return response()->json($data)->header('Cache-Control', 'no-store, no-cache, must-revalidate');
     }
 
     /**

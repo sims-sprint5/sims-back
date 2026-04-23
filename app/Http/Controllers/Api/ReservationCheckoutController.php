@@ -30,7 +30,7 @@ class ReservationCheckoutController extends Controller
         $validated = $request->validate([
             'vehicle_id' => 'required|exists:vehicles,vehicle_id',
             'start_date' => 'required|date',
-            'end_date' => 'required|date|after:start_date',
+            'end_date' => 'required|date|after_or_equal:start_date',
             'pickup_location' => 'nullable|string|max:255',
             'dropoff_location' => 'nullable|string|max:255',
         ]);

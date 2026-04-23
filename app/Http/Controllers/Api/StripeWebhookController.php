@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Reservation;
+use App\Services\ReservationAvailabilityService;
 use App\Services\Stripe\StripeCheckoutService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -85,6 +86,8 @@ class StripeWebhookController extends Controller
                 ->where('reservation_id', $reservation->reservation_id)
                 ->where('status', '!=', 'paid')
                 ->update($updatePayload);
+
+            app(ReservationAvailabilityService::class)->syncVehicleAvailability((int) $reservation->vehicle_id);
         }
 
         if ($event->type === 'checkout.session.expired') {
@@ -105,11 +108,17 @@ class StripeWebhookController extends Controller
                     return response()->json(['received' => true]);
                 }
 
+                $reservationForSync = (clone $reservationQuery)->first();
+
                 $reservationQuery
                     ->where('status', 'pending')
                     ->update([
                         'status' => 'cancelled',
                     ]);
+
+                if ($reservationForSync) {
+                    app(ReservationAvailabilityService::class)->syncVehicleAvailability((int) $reservationForSync->vehicle_id);
+                }
             }
         }
 

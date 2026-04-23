@@ -39,28 +39,34 @@ class StripeCheckoutService
         $successUrl = $this->resolveTenantCheckoutUrl((string) config('services.stripe.success_url'));
         $cancelUrl = $this->resolveTenantCheckoutUrl((string) config('services.stripe.cancel_url'));
 
-        return $this->client->checkout->sessions->create([
+        $lineItem = [
+            'quantity' => 1,
+            'price_data' => [
+                'currency' => $currency,
+                'unit_amount' => $unitAmount,
+                'product_data' => [
+                    'name' => 'Vehicle reservation #'.$reservationId,
+                    'description' => 'One-time reservation payment',
+                ],
+            ],
+        ];
+
+        $metadata = [
+            'reservation_id' => $reservationId,
+            'user_id' => (string) $reservation->user_id,
+            'vehicle_id' => (string) $reservation->vehicle_id,
+        ];
+
+        $payload = [
             'mode' => 'payment',
             'success_url' => $successUrl,
             'cancel_url' => $cancelUrl,
             'payment_method_types' => ['card'],
-            'line_items' => [[
-                'quantity' => 1,
-                'price_data' => [
-                    'currency' => $currency,
-                    'unit_amount' => $unitAmount,
-                    'product_data' => [
-                        'name' => 'Vehicle reservation #'.$reservationId,
-                        'description' => 'One-time reservation payment',
-                    ],
-                ],
-            ]],
-            'metadata' => [
-                'reservation_id' => $reservationId,
-                'user_id' => (string) $reservation->user_id,
-                'vehicle_id' => (string) $reservation->vehicle_id,
-            ],
-        ]);
+            'line_items' => [$lineItem],
+            'metadata' => $metadata,
+        ];
+
+        return $this->client->checkout->sessions->create($payload);
     }
 
     public function resolveReservationPrice(): float
