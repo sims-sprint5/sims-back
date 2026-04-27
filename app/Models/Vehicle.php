@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 
 /**
  * @property int $vehicle_id
@@ -15,7 +16,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property string $status
  * @property string|null $current_latitude
  * @property string|null $current_longitude
- * @property \Illuminate\Support\Carbon|null $last_location_update
+ * @property Carbon|null $last_location_update
  */
 class Vehicle extends Model
 {

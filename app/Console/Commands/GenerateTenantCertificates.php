@@ -17,8 +17,9 @@ class GenerateTenantCertificates extends Command
         $baseDomain = env('TENANT_BASE_DOMAIN', 'localhost');
         $certEmail = env('CERT_EMAIL');
 
-        if (!$certEmail) {
+        if (! $certEmail) {
             $this->error('CERT_EMAIL environment variable is required.');
+
             return Command::FAILURE;
         }
 
