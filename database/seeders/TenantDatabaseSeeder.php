@@ -35,30 +35,30 @@ class TenantDatabaseSeeder extends Seeder
             'status' => 'active',
         ]);
 
-        // Factories disabled in production - seeding only admin user
-        // $users = User::factory()->count(5)->user()->create();
-        // $allUsers = $users->push($admin);
-
         // Create initial Spatie roles and assign Super Admin to the first user in this tenant.
         $this->call(RolesAndPermissionsSeeder::class);
 
-        // Factories disabled in production
-        // $vehicles = Vehicle::factory()->count(8)->create();
+        if (app()->isLocal() || app()->environment('testing')) {
+            $users = User::factory()->count(5)->user()->create();
+            $allUsers = $users->push($admin);
 
-        // for ($i = 0; $i < 6; $i++) {
-        //     Reservation::factory()->create([
-        //         'user_id' => $allUsers->random()->user_id,
-        //         'vehicle_id' => $vehicles->random()->vehicle_id,
-        //     ]);
-        // }
+            $vehicles = Vehicle::factory()->count(8)->create();
 
-        // for ($i = 0; $i < 10; $i++) {
-        //     Ticket::factory()->create([
-        //         'user_id' => $allUsers->random()->user_id,
-        //         'vehicle_id' => $vehicles->random()->vehicle_id,
-        //     ]);
-        // }
+            for ($i = 0; $i < 6; $i++) {
+                Reservation::factory()->create([
+                    'user_id' => $allUsers->random()->user_id,
+                    'vehicle_id' => $vehicles->random()->vehicle_id,
+                ]);
+            }
 
-        // Geofence::factory()->count(5)->create();
+            for ($i = 0; $i < 10; $i++) {
+                Ticket::factory()->create([
+                    'user_id' => $allUsers->random()->user_id,
+                    'vehicle_id' => $vehicles->random()->vehicle_id,
+                ]);
+            }
+
+            Geofence::factory()->count(5)->create();
+        }
     }
 }
