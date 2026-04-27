@@ -61,40 +61,46 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # ---------------- DEBUG SSH ----------------
+      - name: Debug SSH Secret
+        run: |
+          echo "SSH KEY LENGTH:"
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" | wc -c
+
+      # ---------------- SETUP SSH ----------------
       - name: Setup SSH Key
+        shell: bash
         env:
           SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
           SSH_HOST: ${{ secrets.DEPLOY_HOST }}
           SSH_USER: ${{ secrets.DEPLOY_USER }}
         run: |
+          set -e
+
           mkdir -p ~/.ssh
-          echo "$SSH_KEY" > ~/.ssh/deploy_key
+
+          printf "%s" "$SSH_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
+
           ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts
 
+      # ---------------- PULL CODE ----------------
       - name: Pull latest code
-        env:
-          SSH_USER: ${{ secrets.DEPLOY_USER }}
-          SSH_HOST: ${{ secrets.DEPLOY_HOST }}
         run: |
-          ssh -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" "
+          ssh -i ~/.ssh/deploy_key "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" "
             git config --global --add safe.directory /var/www/sims-back &&
             cd /var/www/sims-back &&
             git pull origin main
           "
 
-      - name: Update environment + config
-        env:
-          SSH_USER: ${{ secrets.DEPLOY_USER }}
-          SSH_HOST: ${{ secrets.DEPLOY_HOST }}
+      # ---------------- ENV SETUP ----------------
+      - name: Update environment
         run: |
-          ssh -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" << 'EOF'
+          ssh -i ~/.ssh/deploy_key "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" << 'EOF'
           set -euo pipefail
           cd /var/www/sims-back
 
-          if [ ! -f .env ]; then
-            cp .env.example .env
-          fi
+          [ ! -f .env ] && cp .env.example .env
 
           set_env() {
             key="$1"
@@ -106,70 +112,46 @@ jobs:
             fi
           }
 
-          set_env_if_missing() {
-            key="$1"
-            value="$2"
-            current="$(grep "^${key}=" .env | head -n1 | cut -d= -f2- || true)"
-            if [ -z "$current" ]; then
-              set_env "$key" "$value"
-            fi
-          }
-
           app_domain="$(grep '^APP_DOMAIN=' .env | cut -d= -f2- || true)"
 
-          if [ -z "$app_domain" ]; then
-            echo "APP_DOMAIN no definido"
-            exit 1
-          fi
+          [ -z "$app_domain" ] && exit 1
 
           set_env SESSION_DOMAIN ".$app_domain"
           set_env TENANT_BASE_DOMAIN "$app_domain"
-
-          set_env_if_missing SUPERADMIN_EMAIL "superadmin@example.com"
-          set_env_if_missing SUPERADMIN_PASSWORD "change_me"
-
           EOF
 
+      # ---------------- DEPLOY CONTAINERS ----------------
       - name: Deploy containers
-        env:
-          SSH_USER: ${{ secrets.DEPLOY_USER }}
-          SSH_HOST: ${{ secrets.DEPLOY_HOST }}
         run: |
-          ssh -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" "
+          ssh -i ~/.ssh/deploy_key "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" "
             cd /var/www/sims-back &&
             docker-compose down --volumes --remove-orphans &&
             docker-compose build --no-cache &&
             docker-compose up -d
           "
 
+      # ---------------- MIGRATIONS ----------------
       - name: Run migrations
-        env:
-          SSH_USER: ${{ secrets.DEPLOY_USER }}
-          SSH_HOST: ${{ secrets.DEPLOY_HOST }}
         run: |
-          ssh -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" "
+          ssh -i ~/.ssh/deploy_key "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" "
             cd /var/www/sims-back &&
             sleep 10 &&
             docker-compose exec -T api php artisan migrate --force
           "
 
-      - name: Clear and optimize Laravel
-        env:
-          SSH_USER: ${{ secrets.DEPLOY_USER }}
-          SSH_HOST: ${{ secrets.DEPLOY_HOST }}
+      # ---------------- CLEAN LARAVEL ----------------
+      - name: Optimize Laravel
         run: |
-          ssh -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" "
+          ssh -i ~/.ssh/deploy_key "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" "
             cd /var/www/sims-back &&
             docker-compose exec -T api php artisan optimize:clear &&
             docker-compose exec -T api php artisan config:cache
           "
 
+      # ---------------- RESTART ----------------
       - name: Restart containers
-        env:
-          SSH_USER: ${{ secrets.DEPLOY_USER }}
-          SSH_HOST: ${{ secrets.DEPLOY_HOST }}
         run: |
-          ssh -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" "
+          ssh -i ~/.ssh/deploy_key "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" "
             cd /var/www/sims-back &&
             docker-compose restart
           "
