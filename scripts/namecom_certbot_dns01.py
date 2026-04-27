@@ -32,14 +32,14 @@ from typing import Dict, List, Optional
 # Configuración (editable)
 # =========================
 API_USER = os.getenv("API_USER", "TU_API_USER")
-API_TOKEN = os.getenv("API_TOKEN", "TU_API_TOKEN")
+API_TOKEN = os.getenv("API_TOKEN", "")
 
-DOMINIO_PRINCIPAL = os.getenv("DOMINIO_PRINCIPAL", "simsgrup2.app")
-SUBDOMINIO = os.getenv("SUBDOMINIO", "hola")
+DOMINIO_PRINCIPAL = os.getenv("DOMINIO_PRINCIPAL", "")
+SUBDOMINIO = os.getenv("SUBDOMINIO", "www")
 
 # Certbot / rutas
 CERTBOT_BIN = os.getenv("CERTBOT_BIN", "certbot")
-CERTBOT_EMAIL = os.getenv("CERTBOT_EMAIL", "admin@simsgrup2.app")
+CERTBOT_EMAIL = os.getenv("CERTBOT_EMAIL", "")
 CERTBOT_CONFIG_DIR = os.getenv("CERTBOT_CONFIG_DIR", "/etc/letsencrypt")
 CERTBOT_WORK_DIR = os.getenv("CERTBOT_WORK_DIR", "/var/lib/letsencrypt")
 CERTBOT_LOGS_DIR = os.getenv("CERTBOT_LOGS_DIR", "/var/log/letsencrypt")
