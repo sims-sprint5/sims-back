@@ -35,13 +35,36 @@ jobs:
       - name: Start PostgreSQL
         run: docker compose --env-file .env.ci up -d postgres
 
+      - name: Ensure storage and cache dirs exist
+        run: |
+          docker compose --env-file .env.ci run --rm api bash -lc "
+            mkdir -p bootstrap/cache \
+              storage/logs \
+              storage/framework/cache \
+              storage/framework/sessions \
+              storage/framework/testing \
+              storage/framework/views \
+            && chmod -R 775 bootstrap/cache storage
+          "
+
       - name: Install dependencies
         run: docker compose --env-file .env.ci run --rm api composer install --prefer-dist --no-interaction --no-progress
 
-      - name: Generate APP_KEY
+      - name: Generate APP_KEY and add to .env.ci
         run: |
-          KEY=$(docker compose --env-file .env.ci run --rm api php artisan key:generate --show)
+          KEY=$(docker compose --env-file .env.ci run --rm -e APP_ENV=testing api php artisan key:generate --show)
           echo "APP_KEY=$KEY" >> .env.ci
+
+      - name: Run Pint
+        run: docker compose --env-file .env.ci run --rm api vendor/bin/pint --test
+
+      - name: Run migrations (retry until DB ready)
+        run: |
+          docker compose --env-file .env.ci run --rm -e APP_ENV=testing api bash -lc '
+            for i in $(seq 1 30); do
+              php artisan migrate --no-interaction && break || sleep 2;
+            done
+          '
 
       - name: Run tests
         run: docker compose --env-file .env.ci run --rm -e APP_ENV=testing api php artisan test
@@ -49,7 +72,6 @@ jobs:
       - name: Tear down Docker Compose
         if: always()
         run: docker compose --env-file .env.ci down --volumes --remove-orphans
-
 
   deploy:
     needs: test
@@ -61,46 +83,45 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # ---------------- DEBUG SSH ----------------
-      - name: Debug SSH Secret
-        run: |
-          echo "SSH KEY LENGTH:"
-          echo "${{ secrets.DEPLOY_SSH_KEY }}" | wc -c
-
-      # ---------------- SETUP SSH ----------------
       - name: Setup SSH Key
-        shell: bash
         env:
-          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          SSH_KEY_B64: ${{ secrets.DEPLOY_SSH_KEY_B64 }}
           SSH_HOST: ${{ secrets.DEPLOY_HOST }}
           SSH_USER: ${{ secrets.DEPLOY_USER }}
         run: |
-          set -e
-
           mkdir -p ~/.ssh
-
-          printf "%s" "$SSH_KEY" > ~/.ssh/deploy_key
+          echo "$SSH_KEY_B64" | base64 -d > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          cat >> ~/.ssh/config << EOF
+          Host deploy
+            HostName $SSH_HOST
+            User $SSH_USER
+            IdentityFile ~/.ssh/deploy_key
+            StrictHostKeyChecking no
+          EOF
+          chmod 600 ~/.ssh/config
 
-          ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts
-
-      # ---------------- PULL CODE ----------------
       - name: Pull latest code
+        env:
+          SSH_USER: ${{ secrets.DEPLOY_USER }}
+          SSH_HOST: ${{ secrets.DEPLOY_HOST }}
         run: |
-          ssh -i ~/.ssh/deploy_key "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" "
-            git config --global --add safe.directory /var/www/sims-back &&
-            cd /var/www/sims-back &&
-            git pull origin main
-          "
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" \
+            "git config --global --add safe.directory /var/www/sims-back && cd /var/www/sims-back && git pull origin main"
 
-      # ---------------- ENV SETUP ----------------
-      - name: Update environment
+      - name: Normalize production env for tenant subdomains
+        env:
+          SSH_USER: ${{ secrets.DEPLOY_USER }}
+          SSH_HOST: ${{ secrets.DEPLOY_HOST }}
         run: |
-          ssh -i ~/.ssh/deploy_key "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" << 'EOF'
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" << 'EOF'
           set -euo pipefail
           cd /var/www/sims-back
 
-          [ ! -f .env ] && cp .env.example .env
+          if [ ! -f .env ]; then
+            cp .env.example .env
+          fi
 
           set_env() {
             key="$1"
@@ -108,50 +129,148 @@ jobs:
             if grep -q "^${key}=" .env; then
               sed -i "s|^${key}=.*|${key}=${value}|" .env
             else
-              echo "${key}=${value}" >> .env
+              printf '%s=%s\n' "$key" "$value" >> .env
             fi
           }
 
-          app_domain="$(grep '^APP_DOMAIN=' .env | cut -d= -f2- || true)"
+          set_env_if_missing() {
+            key="$1"
+            value="$2"
+            current="$(grep "^${key}=" .env | head -n1 | cut -d= -f2- | tr -d '\r' || true)"
+            if [ -z "$current" ]; then
+              set_env "$key" "$value"
+            fi
+          }
 
-          [ -z "$app_domain" ] && exit 1
+          app_domain="$(grep '^APP_DOMAIN=' .env | head -n1 | cut -d= -f2- | tr -d '\r' || true)"
+          app_url="$(grep '^APP_URL=' .env | head -n1 | cut -d= -f2- | tr -d '\r' || true)"
 
-          set_env SESSION_DOMAIN ".$app_domain"
+          if [ -z "$app_domain" ] && [ -n "$app_url" ]; then
+            app_domain="$(printf '%s' "$app_url" | sed -E 's#^[a-zA-Z]+://##; s#/.*$##')"
+          fi
+
+          if [ -z "$app_domain" ]; then
+            echo "APP_DOMAIN no está definido y no se pudo inferir desde APP_URL"
+            exit 1
+          fi
+
           set_env TENANT_BASE_DOMAIN "$app_domain"
+          set_env SESSION_DOMAIN ".$app_domain"
+
+          sanctum_domains="${app_domain},,.${app_domain}",185.13.77.175,185.13.77.175:8000
+          set_env SANCTUM_STATEFUL_DOMAINS "$sanctum_domains",http://185.13.77.175,http://185.13.77.175:8000
+
+          cors_origins="https://${app_domain}"
+          set_env CORS_ALLOWED_ORIGINS "$cors_origins"
+
+          cors_pattern="#^https?://[a-z0-9-]+[.]${app_domain//./[.]}(:[0-9]+)?\$#i"
+          set_env CORS_ALLOWED_ORIGINS_PATTERNS "$cors_pattern"
+
+          # SuperAdmin credentials (only set defaults when missing)
+          set_env_if_missing SUPERADMIN_NAME "Super Admin"
+          set_env_if_missing SUPERADMIN_EMAIL "superadmin@example.com"
+          set_env_if_missing SUPERADMIN_PASSWORD "change_this_superadmin_password"
+
+          # Corrige truncados/copias rotas de env anteriores
+          sed -i 's/>$//' .env
           EOF
 
-      # ---------------- DEPLOY CONTAINERS ----------------
-      - name: Deploy containers
+      - name: Build and start Docker containers
+        env:
+          SSH_USER: ${{ secrets.DEPLOY_USER }}
+          SSH_HOST: ${{ secrets.DEPLOY_HOST }}
         run: |
-          ssh -i ~/.ssh/deploy_key "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" "
-            cd /var/www/sims-back &&
-            docker-compose down --volumes --remove-orphans &&
-            docker-compose build --no-cache &&
-            docker-compose up -d
-          "
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" \
+            "cd /var/www/sims-back && \
+             docker-compose down --volumes --remove-orphans && \
+             docker builder prune -af && \
+             docker image prune -af && \
+             docker volume prune -f && \
+             docker-compose build --no-cache && \
+             docker-compose up -d"
 
-      # ---------------- MIGRATIONS ----------------
-      - name: Run migrations
+      - name: Fix runtime permissions and APP_KEY
+        env:
+          SSH_USER: ${{ secrets.DEPLOY_USER }}
+          SSH_HOST: ${{ secrets.DEPLOY_HOST }}
         run: |
-          ssh -i ~/.ssh/deploy_key "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" "
-            cd /var/www/sims-back &&
-            sleep 10 &&
-            docker-compose exec -T api php artisan migrate --force
-          "
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" \
+            "cd /var/www/sims-back && \
+             APP_UID=\$(grep '^UID=' .env | cut -d= -f2 | tr -d '\\r' || true); \
+             APP_GID=\$(grep '^GID=' .env | cut -d= -f2 | tr -d '\\r' || true); \
+             [ -n \"\$APP_UID\" ] || APP_UID=33; \
+             [ -n \"\$APP_GID\" ] || APP_GID=33; \
+             docker-compose exec -T -u root api bash -lc \"mkdir -p /var/www/html/storage/logs /var/www/html/storage/framework/{cache,sessions,views,testing} /var/www/html/bootstrap/cache && touch /var/www/html/storage/logs/laravel.log && chown -R \$APP_UID:\$APP_GID /var/www/html/storage /var/www/html/bootstrap/cache && chmod -R ug+rwX /var/www/html/storage /var/www/html/bootstrap/cache\" && \
+             if ! grep -q '^APP_KEY=base64:' .env; then KEY=\$(docker-compose exec -T api php artisan key:generate --show); sed -i \"s|^APP_KEY=.*|APP_KEY=\$KEY|\" .env; fi && \
+             docker-compose exec -T api php artisan optimize:clear && \
+             docker-compose exec -T api php artisan cache:clear && \
+             docker-compose exec -T api php artisan route:clear && \
+             docker-compose exec -T api php artisan view:clear && \
+             docker-compose exec -T api php artisan config:cache"
 
-      # ---------------- CLEAN LARAVEL ----------------
-      - name: Optimize Laravel
+      - name: Run Laravel migrations
+        env:
+          SSH_USER: ${{ secrets.DEPLOY_USER }}
+          SSH_HOST: ${{ secrets.DEPLOY_HOST }}
         run: |
-          ssh -i ~/.ssh/deploy_key "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" "
-            cd /var/www/sims-back &&
-            docker-compose exec -T api php artisan optimize:clear &&
-            docker-compose exec -T api php artisan config:cache
-          "
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" \
+            "cd /var/www/sims-back && sleep 10 && for i in \$(seq 1 5); do docker-compose exec -T api php artisan migrate --force && break || sleep 5; done"
 
-      # ---------------- RESTART ----------------
+      - name: Run tenant migrations for existing tenants
+        env:
+          SSH_USER: ${{ secrets.DEPLOY_USER }}
+          SSH_HOST: ${{ secrets.DEPLOY_HOST }}
+        run: |
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" << 'EOF'
+          set -euo pipefail
+          cd /var/www/sims-back
+
+          docker-compose exec -T api php -r '
+          require "vendor/autoload.php";
+          $app = require "bootstrap/app.php";
+          $kernel = $app->make(Illuminate\Contracts\Console\Kernel::class);
+          $kernel->bootstrap();
+          $tenants = Illuminate\Support\Facades\DB::table("tenants")->pluck("id");
+          foreach ($tenants as $id) {
+            Illuminate\Support\Facades\DB::statement("CREATE SCHEMA IF NOT EXISTS tenant_" . $id);
+          }
+          '
+
+          docker-compose exec -T api php artisan tenants:migrate --force
+          docker-compose exec -T api php artisan tenants:seed --class=RolesAndPermissionsSeeder --force
+          EOF
+
+      - name: Run Laravel seeders
+        env:
+          SSH_USER: ${{ secrets.DEPLOY_USER }}
+          SSH_HOST: ${{ secrets.DEPLOY_HOST }}
+        run: |
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" \
+            "cd /var/www/sims-back && docker-compose exec -T api php artisan db:seed --force"
+
+      - name: Ensure SuperAdmin exists and password matches env
+        env:
+          SSH_USER: ${{ secrets.DEPLOY_USER }}
+          SSH_HOST: ${{ secrets.DEPLOY_HOST }}
+        run: |
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" \
+            "cd /var/www/sims-back && \
+             docker-compose exec -T api php artisan db:seed --class=SuperAdminSeeder --force"
+
       - name: Restart containers
+        env:
+          SSH_USER: ${{ secrets.DEPLOY_USER }}
+          SSH_HOST: ${{ secrets.DEPLOY_HOST }}
         run: |
-          ssh -i ~/.ssh/deploy_key "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" "
-            cd /var/www/sims-back &&
-            docker-compose restart
-          "
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" \
+            "cd /var/www/sims-back && docker-compose restart"
+
+      - name: Verify deployment
+        env:
+          SSH_USER: ${{ secrets.DEPLOY_USER }}
+          SSH_HOST: ${{ secrets.DEPLOY_HOST }}
+        run: |
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" \
+            "cd /var/www/sims-back && \
+             docker ps --filter label=com.docker.compose.project=sims-back && \
+             docker-compose exec -T api php artisan about >/dev/null || (docker-compose logs --tail 200 api && exit 1)"
