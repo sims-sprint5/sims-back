@@ -159,12 +159,18 @@ CACHE_STORE=database
 SESSION_DRIVER=database
 ```
 
-## ☁️ Despliegue en DigitalOcean (IP `178.62.229.151`)
+## ☁️ Despliegue en Producción (Cualquier Servidor)
 
-1. Crea tu archivo de entorno para servidor:
+1. Crea tu archivo de entorno para servidor basado en `.env.example`:
 
 ```bash
-cp .env.digitalocean.example .env
+cp .env.example .env
+# Edita .env con tu configuración específica del servidor
+#   - APP_URL: tu dominio o IP
+#   - APP_DOMAIN: tu dominio o IP
+#   - TENANT_BASE_DOMAIN: dominio base para los tenants
+#   - DB_HOST, DB_USERNAME, DB_PASSWORD: credenciales de PostgreSQL
+#   - FRONTEND_URL: URL de tu frontend
 ```
 
 2. Genera la key de Laravel:
@@ -173,7 +179,7 @@ cp .env.digitalocean.example .env
 docker compose run --rm api php artisan key:generate --ansi
 ```
 
-3. Levanta servicios en el droplet:
+3. Levanta servicios en el servidor:
 
 ```bash
 docker compose up -d --build
@@ -192,13 +198,15 @@ docker compose exec api php artisan tenants:migrate --force
 docker compose exec api php artisan db:seed --force
 ```
 
-### Nota importante multi-tenant con IP
+### Nota importante multi-tenant
 
-Con solo una IP pública no puedes usar subdominios tipo `empresa1.178.62.229.151`.
-Para mantener el esquema por subdominio sin comprar dominio, esta configuración usa `nip.io`:
+Para mantener el esquema por subdominio en producción, la aplicación está configured para soportar:
+- **URL central:** Tu dominio o IP principal
+- **URLs de tenants:** `{tenant_name}.{tu_dominio}`
 
-- central: `http://178.62.229.151:8000`
-- tenant: `http://empresa1.178.62.229.151.nip.io:8000`
+Si usas solo una IP pública (sin dominio), puedes usar `nip.io` como workaround:
+- central: `http://TU_IP_PUBLICA:8000`
+- tenant: `http://empresa1.TU_IP_PUBLICA.nip.io:8000`
 
 ---
 

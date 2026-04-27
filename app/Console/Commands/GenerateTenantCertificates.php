@@ -15,7 +15,13 @@ class GenerateTenantCertificates extends Command
     public function handle()
     {
         $baseDomain = env('TENANT_BASE_DOMAIN', 'localhost');
-        $certEmail = env('CERT_EMAIL', 'admin@simsgrup2.app');
+        $certEmail = env('CERT_EMAIL');
+
+        if (! $certEmail) {
+            $this->error('CERT_EMAIL environment variable is required.');
+
+            return Command::FAILURE;
+        }
 
         $tenants = Tenant::all();
 

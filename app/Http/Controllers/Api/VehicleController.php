@@ -4,17 +4,53 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Vehicle;
+use App\Services\ReservationAvailabilityService;
 use Illuminate\Http\Request;
 
 class VehicleController extends Controller
 {
+    private function isAdmin(Request $request): bool
+    {
+        $user = $request->user();
+
+        return (bool) ($user?->hasRole('Admin') || strtolower((string) ($user?->role ?? '')) === 'admin');
+    }
+
     /**
      * Display a listing of the resource.
+     *
+     * For normal users: ONLY "available" vehicles (map view)
+     * For admin: all vehicles
      */
     public function index(Request $request)
     {
+        $availability = app(ReservationAvailabilityService::class);
+        $availability->releaseExpiredReservations();
+
         $perPage = $request->integer('per_page', 15);
-        $vehicles = Vehicle::with(['reservations'])->paginate($perPage);
+        $user = $request->user();
+        $query = Vehicle::query()->with(['reservations.user']);
+
+        if (! $this->isAdmin($request)) {
+            // Normal users ONLY see available vehicles on the map
+            $query->where('status', 'available');
+        }
+
+        $vehicles = $query->paginate($perPage);
+
+        // Enrich each vehicle with upcoming reservation info if available
+        $vehicles->getCollection()->transform(function (Vehicle $vehicle) use ($availability) {
+            $nextReservation = $availability->getNextUpcomingReservation((int) $vehicle->vehicle_id);
+            if ($nextReservation) {
+                $vehicle->setAttribute('next_reservation', [
+                    'start_date' => $nextReservation->start_date,
+                    'end_date' => $nextReservation->end_date,
+                    'user_name' => $nextReservation->user?->name,
+                ]);
+            }
+
+            return $vehicle;
+        });
 
         return response()->json($vehicles);
     }
@@ -43,9 +79,32 @@ class VehicleController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(string $id)
+    public function show(Request $request, string $id)
     {
-        $vehicle = Vehicle::with(['reservations', 'tickets'])->findOrFail($id);
+        $availability = app(ReservationAvailabilityService::class);
+        $availability->releaseExpiredReservations();
+
+        if (! $this->isAdmin($request) && $request->user()) {
+            $userId = (int) $request->user()->user_id;
+            $isBlockedForUser = $availability->vehicleHasActiveReservation((int) $id)
+                && ! $availability->userOwnsActiveReservationForVehicle((int) $id, $userId);
+
+            if ($isBlockedForUser) {
+                return response()->json(['message' => 'Vehicle not available.'], 404);
+            }
+        }
+
+        $vehicle = Vehicle::with(['reservations.user', 'tickets'])->findOrFail($id);
+
+        // Add next upcoming reservation info
+        $nextReservation = $availability->getNextUpcomingReservation((int) $id);
+        if ($nextReservation) {
+            $vehicle->setAttribute('next_reservation', [
+                'start_date' => $nextReservation->start_date,
+                'end_date' => $nextReservation->end_date,
+                'user_name' => $nextReservation->user?->name,
+            ]);
+        }
 
         return response()->json($vehicle);
     }
@@ -114,5 +173,116 @@ class VehicleController extends Controller
         ]);
 
         return response()->json($vehicle);
+    }
+
+    /**
+     * Get all vehicles with reservation calendar for the reservations page.
+     * Shows all vehicles (available+reserved) with calendar data.
+     *
+     * For normal users: no filtering (see all)
+     * For admin: see all
+     */
+    public function allWithCalendar(Request $request)
+    {
+        $availability = app(ReservationAvailabilityService::class);
+        $availability->releaseExpiredReservations();
+
+        $perPage = $request->integer('per_page', 15);
+        $query = Vehicle::query()->with(['reservations' => function ($q) {
+            $q->whereIn('status', ['pending', 'paid', 'active'])
+                ->orderBy('start_date', 'asc');
+        }]);
+
+        $vehicles = $query->paginate($perPage);
+
+        // Enrich with calendar and prereservation info
+        $vehicles->getCollection()->transform(function (Vehicle $vehicle) {
+            // Get all future reservations for calendar
+            $futureReservations = $vehicle->reservations
+                ->where('end_date', '>=', now()->startOfDay())
+                ->sortBy('start_date')
+                ->values();
+
+            $blockedDates = [];
+            foreach ($futureReservations as $res) {
+                $current = $res->start_date->copy()->startOfDay();
+                $last = $res->end_date->copy()->startOfDay();
+
+                while ($current->lte($last)) {
+                    $blockedDates[$current->toDateString()] = true;
+                    $current->addDay();
+                }
+            }
+
+            $vehicle->setAttribute('calendar_reservations', $futureReservations->map(function ($res) {
+                return [
+                    'start_date' => $res->start_date->toIso8601String(),
+                    'end_date' => $res->end_date->toIso8601String(),
+                    'user_name' => $res->user?->name,
+                    'status' => $res->status,
+                    'calendar_state' => 'occupied',
+                ];
+            })->toArray());
+
+            $vehicle->setAttribute('blocked_dates', array_keys($blockedDates));
+
+            // Get next available slot
+            if ($futureReservations->isNotEmpty()) {
+                $lastReservation = $futureReservations->last();
+                $vehicle->setAttribute('next_available_at', $lastReservation->end_date->toIso8601String());
+            } else {
+                $vehicle->setAttribute('next_available_at', now()->toIso8601String());
+            }
+
+            return $vehicle;
+        });
+
+        return response()->json($vehicles);
+    }
+
+    /**
+     * Get availability calendar for a specific vehicle.
+     * Returns JSON array of {start, end, status}
+     */
+    public function disponibilitat(string $id)
+    {
+        $vehicle = Vehicle::findOrFail($id);
+
+        $reservations = $vehicle->reservations()
+            ->whereIn('status', ['pending', 'paid', 'active'])
+            ->orderBy('start_date', 'asc')
+            ->get();
+
+        $data = $reservations->map(function ($res) {
+            return [
+                'start' => $res->start_date->format('Y-m-d'),
+                'end' => $res->end_date->format('Y-m-d'),
+                'status' => 'reservat',
+            ];
+        })->toArray();
+
+        return response()->json($data)->header('Cache-Control', 'no-store, no-cache, must-revalidate');
+    }
+
+    /**
+     * Sync all vehicles availability (admin only - for maintenance/debug).
+     */
+    public function syncAllAvailability(Request $request)
+    {
+        if (! $this->isAdmin($request)) {
+            return response()->json(['message' => 'Forbidden.'], 403);
+        }
+
+        $availability = app(ReservationAvailabilityService::class);
+
+        // First release expired reservations
+        $availability->releaseExpiredReservations();
+
+        // Then sync all vehicles
+        $availability->syncAllVehiclesAvailability();
+
+        return response()->json([
+            'message' => 'All vehicles synchronized successfully',
+        ], 200);
     }
 }

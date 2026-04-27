@@ -4,7 +4,20 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 
+/**
+ * @property int $vehicle_id
+ * @property string $license_plate
+ * @property string $brand
+ * @property string $model
+ * @property int|null $year
+ * @property string|null $color
+ * @property string $status
+ * @property string|null $current_latitude
+ * @property string|null $current_longitude
+ * @property Carbon|null $last_location_update
+ */
 class Vehicle extends Model
 {
     use HasFactory;

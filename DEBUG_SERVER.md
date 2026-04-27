@@ -1,10 +1,10 @@
-# Debug Server Errors - 500 en Digital Ocean
+# Debug Server Errors
 
 ## Pasos para debugging en el servidor
 
 ### 1. Conexión SSH
 ```bash
-ssh -i tu_ssh_key tu_usuario@proba16.simsgrup2.app
+ssh -i tu_ssh_key tu_usuario@YOUR_SERVER_IP
 cd /var/www/sims-back
 ```
 
