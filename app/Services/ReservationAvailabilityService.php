@@ -4,16 +4,17 @@ namespace App\Services;
 
 use App\Models\Reservation;
 use App\Models\Vehicle;
+use Carbon\Carbon;
 
 class ReservationAvailabilityService
 {
-    private array $activeStatuses = ['pending', 'active'];
+    private array $activeStatuses = ['pending', 'paid', 'active'];
 
     public function releaseExpiredReservations(): void
     {
         $expiredReservations = Reservation::query()
             ->whereIn('status', $this->activeStatuses)
-            ->where('end_date', '<=', now())
+            ->whereDate('end_date', '<', now()->toDateString())
             ->get();
 
         if ($expiredReservations->isEmpty()) {
@@ -23,6 +24,7 @@ class ReservationAvailabilityService
         $vehicleIds = [];
 
         foreach ($expiredReservations as $reservation) {
+            /** @var Reservation $reservation */
             $vehicleIds[] = (int) $reservation->vehicle_id;
 
             if ($reservation->status !== 'completed') {
@@ -37,13 +39,13 @@ class ReservationAvailabilityService
 
     public function vehicleHasActiveReservation(int $vehicleId, ?int $exceptReservationId = null): bool
     {
-        // Only consider a reservation "active" if it has already started (start_date <= now)
-        // and hasn't ended yet (end_date > now)
+        // Day-based reservation semantics: a reservation is active while today is within
+        // [start_date, end_date], both boundaries inclusive.
         return Reservation::query()
             ->where('vehicle_id', $vehicleId)
             ->whereIn('status', $this->activeStatuses)
-            ->where('start_date', '<=', now())
-            ->where('end_date', '>', now())
+            ->whereDate('start_date', '<=', now()->toDateString())
+            ->whereDate('end_date', '>=', now()->toDateString())
             ->when($exceptReservationId, function ($query, $exceptReservationId) {
                 $query->where('reservation_id', '!=', $exceptReservationId);
             })
@@ -56,8 +58,8 @@ class ReservationAvailabilityService
             ->where('vehicle_id', $vehicleId)
             ->where('user_id', $userId)
             ->whereIn('status', $this->activeStatuses)
-            ->where('start_date', '<=', now())
-            ->where('end_date', '>', now())
+            ->whereDate('start_date', '<=', now()->toDateString())
+            ->whereDate('end_date', '>=', now()->toDateString())
             ->exists();
     }
 
@@ -69,7 +71,7 @@ class ReservationAvailabilityService
         return Reservation::query()
             ->where('vehicle_id', $vehicleId)
             ->whereIn('status', $this->activeStatuses)
-            ->where('start_date', '>', now())
+            ->whereDate('start_date', '>', now()->toDateString())
             ->orderBy('start_date', 'asc')
             ->first();
     }
@@ -100,17 +102,21 @@ class ReservationAvailabilityService
 
     /**
      * Check if a vehicle is available for a specific date/time period.
-     * 
+     *
      * Returns:
      * - ['available' => true] if no conflicts
      * - ['available' => false, 'message' => '...', 'available_at' => '...'] if there's a conflict
      */
     public function checkAvailabilityForPeriod(
         int $vehicleId,
-        \DateTime $startDate,
-        \DateTime $endDate,
+        mixed $startDate,
+        mixed $endDate,
         ?int $exceptReservationId = null
     ): array {
+        // Ensure dates are Carbon instances for proper comparison
+        $startDate = $startDate instanceof Carbon ? $startDate : Carbon::parse($startDate);
+        $endDate = $endDate instanceof Carbon ? $endDate : Carbon::parse($endDate);
+
         // Look for any reservations that overlap with the requested period
         $conflictingReservation = Reservation::query()
             ->where('vehicle_id', $vehicleId)
@@ -118,10 +124,10 @@ class ReservationAvailabilityService
             ->when($exceptReservationId, function ($query, $exceptReservationId) {
                 $query->where('reservation_id', '!=', $exceptReservationId);
             })
-            // Check for overlapping periods:
-            // start_date < requested_end_date AND end_date > requested_start_date
-            ->where('start_date', '<', $endDate)
-            ->where('end_date', '>', $startDate)
+            // Day-based overlap (inclusive):
+            // existing_start <= requested_end AND existing_end >= requested_start
+            ->whereDate('start_date', '<=', $endDate->format('Y-m-d'))
+            ->whereDate('end_date', '>=', $startDate->format('Y-m-d'))
             ->orderBy('end_date', 'asc')
             ->first();
 
@@ -129,11 +135,13 @@ class ReservationAvailabilityService
             return ['available' => true];
         }
 
-        // Vehicle not available - return when it will be available
+        $availableAt = $conflictingReservation->end_date->copy()->addDay()->startOfDay();
+
+        // Vehicle not available - return the next available date.
         return [
             'available' => false,
-            'message' => "Vehicle is not available for the requested period. It will be available from {$conflictingReservation->end_date->format('Y-m-d H:i:s')}.",
-            'available_at' => $conflictingReservation->end_date->toIso8601String(),
+            'message' => 'Vehicle is not available for the requested period. It will be available from '.$availableAt->format('Y-m-d H:i:s').'.',
+            'available_at' => $availableAt->toIso8601String(),
             'conflicting_reservation' => [
                 'start_date' => $conflictingReservation->start_date->toIso8601String(),
                 'end_date' => $conflictingReservation->end_date->toIso8601String(),

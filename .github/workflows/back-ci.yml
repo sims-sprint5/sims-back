@@ -20,7 +20,9 @@ jobs:
             "DB_PASSWORD=postgres" \
             "DB_DATABASE=sims_test" \
             "DB_PORT=5432" \
-            "APP_ENV=testing" > .env.ci
+            "APP_ENV=testing" \
+            "UID=0" \
+            "GID=0" > .env.ci
 
       - name: Build Docker image
         run: docker compose --env-file .env.ci build api
@@ -31,26 +33,17 @@ jobs:
       - name: Wait for PostgreSQL to be ready
         run: |
           docker compose --env-file .env.ci run --rm api bash -c '
-            for i in {1..60}; do
-              pg_isready -h postgres -p 5432 -U postgres && echo "PostgreSQL is ready" && exit 0
-              echo "Waiting for PostgreSQL... ($i/60)"
+            for i in {1..30}; do
+              (echo > /dev/tcp/postgres/5432) 2>/dev/null && echo "PostgreSQL is ready" && exit 0
+              echo "Waiting for PostgreSQL... ($i/30)"
               sleep 1
             done
-            echo "PostgreSQL failed to become ready"
+            echo "PostgreSQL timeout reached"
             exit 1
           '
 
-      - name: Ensure storage and cache dirs exist
-        run: |
-          docker compose --env-file .env.ci run --rm api bash -lc "
-            mkdir -p bootstrap/cache \
-              storage/logs \
-              storage/framework/cache \
-              storage/framework/sessions \
-              storage/framework/testing \
-              storage/framework/views \
-            && chmod -R 775 bootstrap/cache storage
-          "
+      - name: Fix git safe.directory
+        run: docker compose --env-file .env.ci run --rm api git config --global --add safe.directory /var/www/html
 
       - name: Install dependencies
         run: docker compose --env-file .env.ci run --rm api composer install --prefer-dist --no-interaction --no-progress

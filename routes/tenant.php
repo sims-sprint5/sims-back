@@ -3,8 +3,11 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\ChatController;
 use App\Http\Controllers\Api\GeofenceController;
 use App\Http\Controllers\Api\ReservationController;
+use App\Http\Controllers\Api\ReservationCheckoutController;
+use App\Http\Controllers\Api\StripeWebhookController;
 use App\Http\Controllers\Api\TicketController;
 use App\Http\Controllers\Api\TicketMessageController;
 use App\Http\Controllers\Api\UserController;
@@ -18,6 +21,8 @@ Route::prefix('api')->middleware([
     PreventAccessFromCentralDomains::class,
     'api',
 ])->group(function () {
+
+    Route::post('v1/stripe/webhook', [StripeWebhookController::class, 'handle']);
 
     Route::get('whoami', function () {
         return response()->json(['tenant_id' => tenant('id'), 'tenant_name' => tenant('name')]);
@@ -34,7 +39,7 @@ Route::prefix('api')->middleware([
             Route::post('change-password', [AuthController::class, 'changePassword']);
         });
     });
- 
+
     Route::middleware(['auth:sanctum', 'ensure.tenant'])->prefix('v1')->group(function () {
         // Admin-only: user management
         Route::middleware(['role:Admin,sanctum'])->group(function () {
@@ -44,6 +49,7 @@ Route::prefix('api')->middleware([
         // Vehicles: everyone can view, only Admin can mutate/manage
         Route::apiResource('vehicles', VehicleController::class)->only(['index', 'show']);
         Route::get('vehicles-calendar', [VehicleController::class, 'allWithCalendar']);
+        Route::get('disponibilitat/{id}', [VehicleController::class, 'disponibilitat']);
         Route::middleware(['role:Admin,sanctum'])->group(function () {
             Route::apiResource('vehicles', VehicleController::class)->only(['store', 'update', 'destroy']);
             Route::get('vehicles/{id}/reservations', [VehicleController::class, 'reservations']);
@@ -54,6 +60,7 @@ Route::prefix('api')->middleware([
         // Reservations: both roles can use resource endpoints, but Usuario is scoped to own reservations in controller
         Route::get('reservations/user/{userId}', [ReservationController::class, 'byUser']);
         Route::get('reservations/check-availability', [ReservationController::class, 'checkAvailability']);
+        Route::post('reservations/checkout', [ReservationCheckoutController::class, 'store']);
         Route::apiResource('reservations', ReservationController::class);
         Route::post('reservations/{id}/renewal-intent', [ReservationController::class, 'renewalIntent']);
         Route::middleware(['role:Admin,sanctum'])->group(function () {
@@ -81,5 +88,8 @@ Route::prefix('api')->middleware([
             Route::get('geofences/{id}/logs', [GeofenceController::class, 'logs']);
             Route::post('geofences/check-vehicle', [GeofenceController::class, 'checkVehicle']);
         });
+
+        // Chat: everyone authenticated can use the chatbot
+        Route::post('chat/ask', [ChatController::class, 'ask']);
     });
 });
