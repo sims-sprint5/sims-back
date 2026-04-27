@@ -6,18 +6,19 @@ use App\Services\ReservationAvailabilityService;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Carbon;
 
 /**
  * @property int $reservation_id
  * @property int $user_id
  * @property int $vehicle_id
- * @property \Illuminate\Support\Carbon $start_date
- * @property \Illuminate\Support\Carbon $end_date
+ * @property Carbon $start_date
+ * @property Carbon $end_date
  * @property string|null $pickup_location
  * @property string|null $dropoff_location
  * @property string $status
  * @property string|null $stripe_session_id
- * @property \Illuminate\Support\Carbon|null $paid_at
+ * @property Carbon|null $paid_at
  * @property string|null $total_cost
  */
 class Reservation extends Model
