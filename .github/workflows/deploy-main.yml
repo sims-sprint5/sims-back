@@ -209,7 +209,9 @@ jobs:
              docker image prune -af && \
              docker volume prune -f && \
              docker compose build --no-cache && \
-             docker compose up -d"
+             docker compose up -d && \
+             echo 'Waiting for containers to be ready...' && \
+             sleep 30"
 
       - name: Fix runtime permissions and APP_KEY
         env:
@@ -220,6 +222,17 @@ jobs:
           ssh -p ${SSH_PORT:-22} -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" << 'EOFSETUP'
           set -euo pipefail
           cd /var/www/sims-back
+          
+          # Wait for api container to be running and healthy
+          echo "Waiting for API container to be ready..."
+          for i in $(seq 1 120); do
+            if docker compose exec -T api bash -c "true" 2>/dev/null; then
+              echo "API container is ready"
+              break
+            fi
+            echo "Waiting... ($i/120)"
+            sleep 1
+          done
           
           # Get UID and GID from .env or use defaults
           APP_UID=$(grep '^UID=' .env | cut -d= -f2 | tr -d '\r' || true)
