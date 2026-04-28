@@ -88,14 +88,16 @@ jobs:
           SSH_KEY_B64: ${{ secrets.DEPLOY_SSH_KEY_B64 }}
           SSH_HOST: ${{ secrets.DEPLOY_HOST }}
           SSH_USER: ${{ secrets.DEPLOY_USER }}
+          SSH_PORT: ${{ secrets.DEPLOY_PORT }}
         run: |
           mkdir -p ~/.ssh
           echo "$SSH_KEY_B64" | base64 -d > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          ssh-keyscan -p ${SSH_PORT:-22} -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
           cat >> ~/.ssh/config << EOF
           Host deploy
             HostName $SSH_HOST
+            Port ${SSH_PORT:-22}
             User $SSH_USER
             IdentityFile ~/.ssh/deploy_key
             StrictHostKeyChecking no
