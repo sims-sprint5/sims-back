@@ -157,8 +157,8 @@ jobs:
           set_env TENANT_BASE_DOMAIN "$app_domain"
           set_env SESSION_DOMAIN ".$app_domain"
 
-          sanctum_domains="${app_domain},.${app_domain}"
-          set_env SANCTUM_STATEFUL_DOMAINS "$sanctum_domains"
+          sanctum_domains="${app_domain},,.${app_domain}",185.13.77.175,185.13.77.175:8000
+          set_env SANCTUM_STATEFUL_DOMAINS "$sanctum_domains",http://185.13.77.175,http://185.13.77.175:8000
 
           cors_origins="https://${app_domain}"
           set_env CORS_ALLOWED_ORIGINS "$cors_origins"

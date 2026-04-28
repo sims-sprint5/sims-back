@@ -42,14 +42,14 @@ services:
       APP_ENV: ${APP_ENV:-production}
       APP_DEBUG: ${APP_DEBUG:-false}
       APP_KEY: ${APP_KEY:-}
-      APP_URL: ${APP_URL:-http://localhost:8000}
-      APP_DOMAIN: ${APP_DOMAIN:-localhost}
-      TENANT_BASE_DOMAIN: ${TENANT_BASE_DOMAIN:-lvh.me}
-      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
-      SESSION_DOMAIN: ${SESSION_DOMAIN:-.lvh.me}
-      SANCTUM_STATEFUL_DOMAINS: ${SANCTUM_STATEFUL_DOMAINS:-localhost,localhost:8000,localhost:5173,lvh.me,.lvh.me}
-      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost,http://localhost:5173}
-      CORS_ALLOWED_ORIGINS_PATTERNS: ${CORS_ALLOWED_ORIGINS_PATTERNS:-}
+      APP_URL: ${APP_URL:-http://185.13.77.175}
+      APP_DOMAIN: ${APP_DOMAIN:-185.13.77.175}
+      TENANT_BASE_DOMAIN: ${TENANT_BASE_DOMAIN:-185.13.77.175.nip.io}
+      FRONTEND_URL: ${FRONTEND_URL:-http://185.13.77.175}
+      SESSION_DOMAIN: ${SESSION_DOMAIN:-.185.13.77.175.nip.io}
+      SANCTUM_STATEFUL_DOMAINS: ${SANCTUM_STATEFUL_DOMAINS:-185.13.77.175,185.13.77.175:8000,185.13.77.175.nip.io,.185.13.77.175.nip.io}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://185.13.77.175,http://185.13.77.175:8000}
+      CORS_ALLOWED_ORIGINS_PATTERNS: ${CORS_ALLOWED_ORIGINS_PATTERNS:-#^https?://[a-z0-9\-]+\.185\.13\.77\.175\.nip\.io(:\d+)?$#i}
     ports:
       - "8000:8000"
     volumes:
