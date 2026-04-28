@@ -217,19 +217,39 @@ jobs:
           SSH_HOST: ${{ secrets.DEPLOY_HOST }}
           SSH_PORT: ${{ secrets.DEPLOY_PORT }}
         run: |
-          ssh -p ${SSH_PORT:-22} -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" \
-            "cd /var/www/sims-back && \
-             APP_UID=\$(grep '^UID=' .env | cut -d= -f2 | tr -d '\\r' || true); \
-             APP_GID=\$(grep '^GID=' .env | cut -d= -f2 | tr -d '\\r' || true); \
-             [ -n \"\$APP_UID\" ] || APP_UID=33; \
-             [ -n \"\$APP_GID\" ] || APP_GID=33; \
-             docker compose exec -T -u root api bash -lc \"mkdir -p /var/www/html/storage/logs /var/www/html/storage/framework/{cache,sessions,views,testing} /var/www/html/bootstrap/cache && touch /var/www/html/storage/logs/laravel.log && chown -R \$APP_UID:\$APP_GID /var/www/html/storage /var/www/html/bootstrap/cache && chmod -R ug+rwX /var/www/html/storage /var/www/html/bootstrap/cache\" && \
-             if ! grep -q '^APP_KEY=base64:' .env; then KEY=\$(docker compose exec -T api php artisan key:generate --show); sed -i \"s|^APP_KEY=.*|APP_KEY=\$KEY|\" .env; fi && \
-             docker compose exec -T api php artisan optimize:clear && \
-             docker compose exec -T api php artisan cache:clear && \
-             docker compose exec -T api php artisan route:clear && \
-             docker compose exec -T api php artisan view:clear && \
-             docker compose exec -T api php artisan config:cache"
+          ssh -p ${SSH_PORT:-22} -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" << 'EOFSETUP'
+          set -euo pipefail
+          cd /var/www/sims-back
+          
+          # Get UID and GID from .env or use defaults
+          APP_UID=$(grep '^UID=' .env | cut -d= -f2 | tr -d '\r' || true)
+          APP_GID=$(grep '^GID=' .env | cut -d= -f2 | tr -d '\r' || true)
+          [ -n "$APP_UID" ] || APP_UID=33
+          [ -n "$APP_GID" ] || APP_GID=33
+          
+          # Create storage and cache directories with proper permissions
+          docker compose exec -T -u root api bash -lc "
+            mkdir -p /var/www/html/storage/logs
+            mkdir -p /var/www/html/storage/framework/{cache,sessions,views,testing}
+            mkdir -p /var/www/html/bootstrap/cache
+            touch /var/www/html/storage/logs/laravel.log
+            chown -R $APP_UID:$APP_GID /var/www/html/storage /var/www/html/bootstrap/cache
+            chmod -R ug+rwX /var/www/html/storage /var/www/html/bootstrap/cache
+          "
+          
+          # Generate and set APP_KEY if not already set
+          if ! grep -q '^APP_KEY=base64:' .env; then
+            KEY=$(docker compose exec -T api php artisan key:generate --show)
+            sed -i "s|^APP_KEY=.*|APP_KEY=$KEY|" .env
+          fi
+          
+          # Clear caches and compile configuration
+          docker compose exec -T api php artisan optimize:clear
+          docker compose exec -T api php artisan cache:clear
+          docker compose exec -T api php artisan route:clear
+          docker compose exec -T api php artisan view:clear
+          docker compose exec -T api php artisan config:cache
+          EOFSETUP
 
       - name: Run Laravel migrations
         env:
