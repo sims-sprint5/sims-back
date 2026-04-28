@@ -33,7 +33,7 @@ class RolesAndPermissionsSeeder extends Seeder
 
         $superAdminRole = Role::findOrCreate('Super Admin', $guardName);
         $adminRole = Role::findOrCreate('Admin', $guardName);
-        $userRole = Role::findOrCreate('Usuario', $guardName);
+        $userRole = Role::findOrCreate('User', $guardName);
 
         // Permissions (coarse-grained, mapped to current endpoints)
         $permissions = [

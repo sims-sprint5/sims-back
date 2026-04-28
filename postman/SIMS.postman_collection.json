@@ -2,7 +2,7 @@
   "info": {
     "name": "SIMS API (v1) — Roles & Permissions",
     "_postman_id": "8e5f6f75-97ab-4c39-9f6a-5dd2f1d67a9e",
-    "description": "Collection to validate SuperAdmin (central) vs Tenant (Admin/Usuario) permissions.",
+    "description": "Collection to validate SuperAdmin (central) vs Tenant (Admin/User) permissions.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "event": [
@@ -247,10 +247,10 @@
       ]
     },
     {
-      "name": "Tenant — Permission checks (Usuario vs Admin)",
+      "name": "Tenant — Permission checks (User vs Admin)",
       "item": [
         {
-          "name": "Vehicles list (Usuario) — should be 200",
+          "name": "Vehicles list (User) — should be 200",
           "request": {
             "auth": {
               "type": "bearer",
@@ -267,7 +267,7 @@
           }
         },
         {
-          "name": "Users index (Usuario) — should be 403",
+          "name": "Users index (User) — should be 403",
           "request": {
             "auth": {
               "type": "bearer",
@@ -301,7 +301,7 @@
           }
         },
         {
-          "name": "Create reservation (Usuario) — stores reservationId",
+          "name": "Create reservation (User) — stores reservationId",
           "event": [
             {
               "listen": "test",
@@ -341,7 +341,7 @@
           }
         },
         {
-          "name": "My reservations (Usuario) — should be 200",
+          "name": "My reservations (User) — should be 200",
           "request": {
             "auth": {
               "type": "bearer",
@@ -358,7 +358,7 @@
           }
         },
         {
-          "name": "Reservation status update (Usuario) — should be 403 (Admin-only route)",
+          "name": "Reservation status update (User) — should be 403 (Admin-only route)",
           "request": {
             "auth": {
               "type": "bearer",
