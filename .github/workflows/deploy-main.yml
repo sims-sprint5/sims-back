@@ -120,7 +120,10 @@ jobs:
           
           # Configure git safe directory and use GitHub SSH key for fetch
           git config --global --add safe.directory /var/www/sims-back
-          git config core.sshCommand "ssh -i /home/$USER/.ssh/github_deploy_repo -o StrictHostKeyChecking=no"
+          git config core.sshCommand "ssh -i ~/.ssh/github_deploy_repo -o StrictHostKeyChecking=no"
+          
+          # Verify SSH key exists and is accessible
+          test -f ~/.ssh/github_deploy_repo || (echo "SSH key not found"; exit 1)
           
           # Fetch and reset to latest
           git fetch --all --prune
