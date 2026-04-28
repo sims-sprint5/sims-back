@@ -108,16 +108,18 @@ jobs:
         env:
           SSH_USER: ${{ secrets.DEPLOY_USER }}
           SSH_HOST: ${{ secrets.DEPLOY_HOST }}
+          SSH_PORT: ${{ secrets.DEPLOY_PORT }}
         run: |
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" \
+          ssh -p ${SSH_PORT:-22} -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" \
             "git config --global --add safe.directory /var/www/sims-back && cd /var/www/sims-back && git pull origin main"
 
       - name: Normalize production env for tenant subdomains
         env:
           SSH_USER: ${{ secrets.DEPLOY_USER }}
           SSH_HOST: ${{ secrets.DEPLOY_HOST }}
+          SSH_PORT: ${{ secrets.DEPLOY_PORT }}
         run: |
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" << 'EOF'
+          ssh -p ${SSH_PORT:-22} -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" << 'EOF'
           set -euo pipefail
           cd /var/www/sims-back
 
@@ -181,8 +183,9 @@ jobs:
         env:
           SSH_USER: ${{ secrets.DEPLOY_USER }}
           SSH_HOST: ${{ secrets.DEPLOY_HOST }}
+          SSH_PORT: ${{ secrets.DEPLOY_PORT }}
         run: |
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" \
+          ssh -p ${SSH_PORT:-22} -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" \
             "cd /var/www/sims-back && \
              docker-compose down --volumes --remove-orphans && \
              docker builder prune -af && \
@@ -195,8 +198,9 @@ jobs:
         env:
           SSH_USER: ${{ secrets.DEPLOY_USER }}
           SSH_HOST: ${{ secrets.DEPLOY_HOST }}
+          SSH_PORT: ${{ secrets.DEPLOY_PORT }}
         run: |
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" \
+          ssh -p ${SSH_PORT:-22} -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" \
             "cd /var/www/sims-back && \
              APP_UID=\$(grep '^UID=' .env | cut -d= -f2 | tr -d '\\r' || true); \
              APP_GID=\$(grep '^GID=' .env | cut -d= -f2 | tr -d '\\r' || true); \
@@ -214,16 +218,18 @@ jobs:
         env:
           SSH_USER: ${{ secrets.DEPLOY_USER }}
           SSH_HOST: ${{ secrets.DEPLOY_HOST }}
+          SSH_PORT: ${{ secrets.DEPLOY_PORT }}
         run: |
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" \
+          ssh -p ${SSH_PORT:-22} -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" \
             "cd /var/www/sims-back && sleep 10 && for i in \$(seq 1 5); do docker-compose exec -T api php artisan migrate --force && break || sleep 5; done"
 
       - name: Run tenant migrations for existing tenants
         env:
           SSH_USER: ${{ secrets.DEPLOY_USER }}
           SSH_HOST: ${{ secrets.DEPLOY_HOST }}
+          SSH_PORT: ${{ secrets.DEPLOY_PORT }}
         run: |
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" << 'EOF'
+          ssh -p ${SSH_PORT:-22} -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" << 'EOF'
           set -euo pipefail
           cd /var/www/sims-back
 
@@ -246,16 +252,18 @@ jobs:
         env:
           SSH_USER: ${{ secrets.DEPLOY_USER }}
           SSH_HOST: ${{ secrets.DEPLOY_HOST }}
+          SSH_PORT: ${{ secrets.DEPLOY_PORT }}
         run: |
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" \
+          ssh -p ${SSH_PORT:-22} -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" \
             "cd /var/www/sims-back && docker-compose exec -T api php artisan db:seed --force"
 
       - name: Ensure SuperAdmin exists and password matches env
         env:
           SSH_USER: ${{ secrets.DEPLOY_USER }}
           SSH_HOST: ${{ secrets.DEPLOY_HOST }}
+          SSH_PORT: ${{ secrets.DEPLOY_PORT }}
         run: |
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" \
+          ssh -p ${SSH_PORT:-22} -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" \
             "cd /var/www/sims-back && \
              docker-compose exec -T api php artisan db:seed --class=SuperAdminSeeder --force"
 
@@ -263,16 +271,18 @@ jobs:
         env:
           SSH_USER: ${{ secrets.DEPLOY_USER }}
           SSH_HOST: ${{ secrets.DEPLOY_HOST }}
+          SSH_PORT: ${{ secrets.DEPLOY_PORT }}
         run: |
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" \
+          ssh -p ${SSH_PORT:-22} -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" \
             "cd /var/www/sims-back && docker-compose restart"
 
       - name: Verify deployment
         env:
           SSH_USER: ${{ secrets.DEPLOY_USER }}
           SSH_HOST: ${{ secrets.DEPLOY_HOST }}
+          SSH_PORT: ${{ secrets.DEPLOY_PORT }}
         run: |
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" \
+          ssh -p ${SSH_PORT:-22} -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" \
             "cd /var/www/sims-back && \
              docker ps --filter label=com.docker.compose.project=sims-back && \
              docker-compose exec -T api php artisan about >/dev/null || (docker-compose logs --tail 200 api && exit 1)"
