@@ -114,12 +114,13 @@ jobs:
           set -euo pipefail
           cd /var/www/sims-back
           
-          # Fix permissions in .git directory
-          chmod -R u+w .git 2>/dev/null || true
+          # Fix ownership and permissions for git operations
+          sudo chown -R $USER:$USER .git 2>/dev/null || true
+          sudo chmod -R u+w .git 2>/dev/null || true
           
           # Configure git safe directory and pull
           git config --global --add safe.directory /var/www/sims-back
-          git fetch origin main
+          git fetch --all --prune
           git reset --hard origin/main
           EOF
 
