@@ -110,8 +110,18 @@ jobs:
           SSH_HOST: ${{ secrets.DEPLOY_HOST }}
           SSH_PORT: ${{ secrets.DEPLOY_PORT }}
         run: |
-          ssh -p ${SSH_PORT:-22} -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" \
-            "git config --global --add safe.directory /var/www/sims-back && cd /var/www/sims-back && git pull origin main"
+          ssh -p ${SSH_PORT:-22} -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" << 'EOF'
+          set -euo pipefail
+          cd /var/www/sims-back
+          
+          # Fix permissions in .git directory
+          chmod -R u+w .git 2>/dev/null || true
+          
+          # Configure git safe directory and pull
+          git config --global --add safe.directory /var/www/sims-back
+          git fetch origin main
+          git reset --hard origin/main
+          EOF
 
       - name: Normalize production env for tenant subdomains
         env:
