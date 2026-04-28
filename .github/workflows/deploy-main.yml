@@ -118,8 +118,11 @@ jobs:
           sudo chown -R $USER:$USER .git 2>/dev/null || true
           sudo chmod -R u+w .git 2>/dev/null || true
           
-          # Configure git safe directory and pull
+          # Configure git safe directory and use GitHub SSH key for fetch
           git config --global --add safe.directory /var/www/sims-back
+          git config core.sshCommand "ssh -i /home/$USER/.ssh/github_deploy_repo -o StrictHostKeyChecking=no"
+          
+          # Fetch and reset to latest
           git fetch --all --prune
           git reset --hard origin/main
           EOF
