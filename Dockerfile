@@ -38,11 +38,15 @@ RUN mkdir -p storage/logs bootstrap/cache \
 # Allow www-data to run certbot without password
 RUN echo 'www-data ALL=(ALL) NOPASSWD: /usr/bin/certbot, /usr/sbin/nginx' >> /etc/sudoers
 
-# 7️⃣ Instalar dependencias PHP con Composer
-RUN composer install --no-dev --optimize-autoloader
+# 7️⃣ Crear .env temporal para el build (se reemplaza en runtime)
+RUN cp .env.example .env && echo "APP_KEY=" >> .env
 
-# 8️⃣ Exponer puerto
+# 8️⃣ Instalar dependencias PHP con Composer
+RUN composer install --no-dev --optimize-autoloader --no-interaction --no-scripts \
+    && composer dump-autoload --no-dev --optimize
+
+# 9️⃣ Exponer puerto
 EXPOSE 8000
 
-# 9️⃣ Comando por defecto — Artisan dev server
+# 🔟 Comando por defecto — Artisan dev server
 CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8000"]
