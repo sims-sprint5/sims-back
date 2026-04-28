@@ -210,8 +210,10 @@ jobs:
              docker volume prune -f && \
              docker compose build --no-cache && \
              docker compose up -d && \
-             echo 'Waiting for containers to be ready...' && \
-             sleep 30"
+             echo 'Containers started, waiting for initialization (60 seconds)...' && \
+             sleep 60 && \
+             echo 'Verifying containers are running...' && \
+             docker compose ps"
 
       - name: Fix runtime permissions and APP_KEY
         env:
@@ -223,15 +225,33 @@ jobs:
           set -euo pipefail
           cd /var/www/sims-back
           
-          # Wait for api container to be running and healthy
-          echo "Waiting for API container to be ready..."
-          for i in $(seq 1 120); do
-            if docker compose exec -T api bash -c "true" 2>/dev/null; then
-              echo "API container is ready"
+          # Wait for api container to be running
+          echo "Checking if API container is running..."
+          for i in $(seq 1 60); do
+            STATUS=$(docker compose ps api --format "{{.State}}" 2>/dev/null || echo "error")
+            if [ "$STATUS" = "running" ]; then
+              echo "API container is running"
               break
             fi
-            echo "Waiting... ($i/120)"
-            sleep 1
+            echo "Attempt $i/60: Container status=$STATUS, waiting..."
+            sleep 2
+          done
+          
+          # Additional wait for PHP-FPM to fully initialize
+          echo "Waiting for PHP-FPM to initialize..."
+          sleep 10
+          
+          # Final check - test if api responds
+          max_attempts=30
+          attempt=0
+          while [ $attempt -lt $max_attempts ]; do
+            if docker compose exec -T api bash -c "echo 'PHP is ready'" 2>/dev/null; then
+              echo "PHP-FPM is ready"
+              break
+            fi
+            attempt=$((attempt+1))
+            echo "Waiting for PHP-FPM ($attempt/$max_attempts)..."
+            sleep 2
           done
           
           # Get UID and GID from .env or use defaults
