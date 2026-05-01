@@ -225,34 +225,51 @@ jobs:
           set -euo pipefail
           cd /var/www/sims-back
           
-          # Wait for api container to be running
-          echo "Checking if API container is running..."
-          for i in $(seq 1 60); do
-            STATUS=$(docker compose ps api --format "{{.State}}" 2>/dev/null || echo "error")
-            if [ "$STATUS" = "running" ]; then
-              echo "API container is running"
-              break
-            fi
-            echo "Attempt $i/60: Container status=$STATUS, waiting..."
-            sleep 2
-          done
+          echo "========== DEBUG: Checking Docker state =========="
+          docker compose ps
+          echo ""
           
-          # Additional wait for PHP-FPM to fully initialize
-          echo "Waiting for PHP-FPM to initialize..."
-          sleep 10
+          echo "========== DEBUG: API Container logs (last 100 lines) =========="
+          docker compose logs --tail=100 api || echo "No logs yet"
+          echo ""
           
-          # Final check - test if api responds
-          max_attempts=30
+          # Check processes inside container
+          echo "========== DEBUG: Checking Supervisor inside container =========="
+          docker compose exec -T api ps aux | grep -E "supervisor|php-fpm|nginx|artisan" || echo "No supervisor/php-fpm running"
+          echo ""
+          
+          # Wait for PHP-FPM to be ready (up to 90 seconds)
+          echo "Waiting for PHP-FPM initialization (up to 90 seconds)..."
           attempt=0
+          max_attempts=45
           while [ $attempt -lt $max_attempts ]; do
-            if docker compose exec -T api bash -c "echo 'PHP is ready'" 2>/dev/null; then
-              echo "PHP-FPM is ready"
+            attempt=$((attempt+1))
+            
+            # Try to execute a simple PHP command
+            if docker compose exec -T api php -v > /dev/null 2>&1; then
+              echo "✓ PHP-FPM is responding (attempt $attempt/$max_attempts)"
               break
             fi
-            attempt=$((attempt+1))
-            echo "Waiting for PHP-FPM ($attempt/$max_attempts)..."
+            
+            if [ $((attempt % 5)) -eq 0 ]; then
+              echo "DEBUG: Attempt $attempt/$max_attempts - Container status:"
+              docker compose ps api
+              echo "Last lines from container:"
+              docker compose logs --tail=3 api || true
+            fi
+            
             sleep 2
           done
+          
+          if [ $attempt -ge $max_attempts ]; then
+            echo "❌ ERROR: PHP-FPM not responding after $max_attempts attempts (90 seconds)"
+            echo "========== FINAL DEBUG: Full container logs =========="
+            docker compose logs --tail=200 api
+            echo ""
+            echo "========== DEBUG: Docker inspect api container =========="
+            docker inspect sims_api | grep -A5 State || true
+            exit 1
+          fi
           
           # Get UID and GID from .env or use defaults
           APP_UID=$(grep '^UID=' .env | cut -d= -f2 | tr -d '\r' || true)
