@@ -50,7 +50,8 @@ RUN composer install --no-dev --optimize-autoloader --no-interaction --no-script
 
 # 9️⃣ Configurar Nginx para proxy a PHP-FPM en puerto 8000
 RUN mkdir -p /etc/nginx/sites-enabled /etc/nginx/sites-available && \
-    echo 'server {
+    cat > /etc/nginx/sites-available/default << 'NGINX_EOF'
+server {
     listen 8000 default_server;
     server_name _;
     root /var/www/html/public;
@@ -72,13 +73,15 @@ RUN mkdir -p /etc/nginx/sites-enabled /etc/nginx/sites-available && \
     location ~ /\.(?!well-known).* {
         deny all;
     }
-}' > /etc/nginx/sites-available/default && \
+}
+NGINX_EOF
     ln -sf /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default && \
     sed -i 's/^user nginx;/user www-data;/' /etc/nginx/nginx.conf && \
     sed -i 's/^    worker_processes auto;/    worker_processes 2;/' /etc/nginx/nginx.conf
 
 # 🔟 Configurar Supervisor para ejecutar PHP-FPM y Nginx
-RUN echo '[supervisord]
+RUN cat > /etc/supervisor/conf.d/laravel.conf << 'SUPERVISOR_EOF'
+[supervisord]
 nodaemon=true
 logfile=/var/log/supervisor/supervisord.log
 pidfile=/var/run/supervisord.pid
@@ -97,13 +100,15 @@ autostart=true
 autorestart=unexpected
 redirect_stderr=true
 stdout_logfile=/var/log/supervisor/nginx.log
-stderr_logfile=/var/log/supervisor/nginx-err.log' > /etc/supervisor/conf.d/laravel.conf
+stderr_logfile=/var/log/supervisor/nginx-err.log
+SUPERVISOR_EOF
 
 # 1️⃣1️⃣ Exponer puertos (8000 para Nginx, 9000 para PHP-FPM)
 EXPOSE 8000 9000
 
 # 1️⃣2️⃣ Script de entrada para preparar la app y ejecutar Supervisor
-RUN echo '#!/bin/bash
+RUN cat > /usr/local/bin/entrypoint.sh << 'ENTRYPOINT_EOF'
+#!/bin/bash
 set -e
 echo "======= SIMS Backend Initialization ========="
 echo "Preparing Laravel application directories..."
@@ -111,6 +116,8 @@ mkdir -p bootstrap/cache storage/logs storage/framework/{cache,sessions,views,te
 chown -R www-data:www-data bootstrap storage public
 chmod -R 775 bootstrap storage
 echo "Starting services (PHP-FPM + Nginx)..."
-exec /usr/bin/supervisord -c /etc/supervisor/supervisord.conf' > /usr/local/bin/entrypoint.sh && chmod +x /usr/local/bin/entrypoint.sh
+exec /usr/bin/supervisord -c /etc/supervisor/supervisord.conf
+ENTRYPOINT_EOF
+    chmod +x /usr/local/bin/entrypoint.sh
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
