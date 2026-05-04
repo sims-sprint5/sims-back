@@ -322,30 +322,8 @@ jobs:
           ssh -p ${SSH_PORT:-22} -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" \
             "cd /var/www/sims-back && sleep 10 && for i in \$(seq 1 5); do docker compose exec -T api php artisan migrate --force && break || sleep 5; done"
 
-      - name: Run tenant migrations for existing tenants
-        env:
-          SSH_USER: ${{ secrets.DEPLOY_USER }}
-          SSH_HOST: ${{ secrets.DEPLOY_HOST }}
-          SSH_PORT: ${{ secrets.DEPLOY_PORT }}
-        run: |
-          ssh -p ${SSH_PORT:-22} -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" << 'EOF'
-          set -euo pipefail
-          cd /var/www/sims-back
-
-          docker compose exec -T api php -r '
-          require "vendor/autoload.php";
-          $app = require "bootstrap/app.php";
-          $kernel = $app->make(Illuminate\Contracts\Console\Kernel::class);
-          $kernel->bootstrap();
-          $tenants = Illuminate\Support\Facades\DB::table("tenants")->pluck("id");
-          foreach ($tenants as $id) {
-            Illuminate\Support\Facades\DB::statement("CREATE SCHEMA IF NOT EXISTS tenant_" . $id);
-          }
-          '
-
-          docker compose exec -T api php artisan tenants:migrate --force
-          docker compose exec -T api php artisan tenants:seed --class=RolesAndPermissionsSeeder --force
-          EOF
+      # TODO: Run tenant migrations for existing tenants (tenants created manually)
+      # This step is commented out because tenants are created manually as per project requirement
 
       - name: Run Laravel seeders
         env:
