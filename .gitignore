@@ -74,11 +74,18 @@ Homestead.json
 *.sublime-workspace
 *.sublime-project
 
-# Keep storage and bootstrap/cache directories in repo structure but ignore their runtime files
-/storage/framework/cache/data/
-/storage/framework/sessions/
-/storage/framework/views/
+# Ignore all storage contents except structure
+/storage/app/
+/storage/framework/
 /storage/logs/
+# But keep the directory structure by not ignoring .gitkeep files
+!/storage/app/.gitkeep
+!/storage/app/private/.gitkeep
+!/storage/app/public/.gitkeep
+!/storage/framework/cache/.gitkeep
+!/storage/framework/sessions/.gitkeep
+!/storage/framework/testing/.gitkeep
+!/storage/framework/views/.gitkeep
 
 # Ignore API tests and Postman collection
 /API_TESTS.md
