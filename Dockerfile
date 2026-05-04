@@ -64,7 +64,8 @@ RUN ln -sf /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default &
 RUN printf '[supervisord]\nnodaemon=true\nsilent=true\npidfile=/tmp/supervisord.pid\nlogfile=/tmp/supervisord.log\n\n[program:php-fpm]\ncommand=/usr/local/sbin/php-fpm\nautorestart=unexpected\nstdout_logfile=/dev/stdout\nstdout_logfile_maxbytes=0\nstderr_logfile=/dev/stderr\nstderr_logfile_maxbytes=0\n\n[program:nginx]\ncommand=/usr/sbin/nginx -g "daemon off;"\nautorestart=unexpected\nstdout_logfile=/dev/stdout\nstdout_logfile_maxbytes=0\nstderr_logfile=/dev/stderr\nstderr_logfile_maxbytes=0' > /etc/supervisor/conf.d/laravel.conf
 
 # Script de entrada - ejecutar PHP-FPM y Nginx sin supervisor
-RUN printf '#!/bin/bash\nset -e\necho "======= SIMS Backend Initialization ========="\necho "Preparing Laravel application directories..."\nmkdir -p bootstrap/cache storage/logs storage/framework/{cache,sessions,views,testing}\nchmod -R 775 bootstrap storage\necho "Starting PHP-FPM and Nginx..."\n/usr/local/sbin/php-fpm -D\n/usr/sbin/nginx -g "daemon off;"\n' > /usr/local/bin/entrypoint.sh && \
+RUN printf '#!/bin/bash\nset -e\necho "======= SIMS Backend Initialization ========="\necho "Preparing Laravel application directories..."\nmkdir -p bootstrap/cache storage/logs storage/framework/{cache,sessions,views,testing}\nfor dir in storage bootstrap/cache; do\n  if [ -d "$dir" ]; then\n    chmod -R 775 "$dir" 2>/dev/null || true\n  fi\ndone\necho "Starting PHP-FPM and Nginx..."\n/usr/local/sbin/php-fpm -D\n/usr/sbin/nginx -g "daemon off;"\n' > /usr/local/bin/entrypoint.sh && \
+    chmod +x /usr/local/bin/entrypoint.sh
     chmod +x /usr/local/bin/entrypoint.sh
 
 # Exponer puertos
