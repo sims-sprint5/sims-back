@@ -37,17 +37,11 @@ RUN composer install \
 # ===== STAGE 2: Runtime (aplicación final) =====
 FROM php:8.4-fpm
 
-# Instalar solo dependencias de runtime
+# Solo instalar herramientas essentials (php-fpm ya tiene librerías compiladas)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libpq5 \
-    libzip4 \
-    libonig5 \
     curl \
     git \
     && rm -rf /var/lib/apt/lists/*
-
-# Instalar extensiones PHP
-RUN docker-php-ext-install pdo_pgsql mbstring zip
 
 # Crear usuario no-root (laravel con UID 1000)
 RUN useradd -m -u 1000 laravel
