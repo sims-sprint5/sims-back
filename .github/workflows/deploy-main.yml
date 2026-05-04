@@ -213,8 +213,8 @@ jobs:
              docker volume prune -f && \
              docker compose build --no-cache && \
              docker compose up -d && \
-             echo 'Containers started, waiting for initialization (60 seconds)...' && \
-             sleep 60 && \
+             echo 'Containers started, waiting for fully initialization (composer install may take time)...' && \
+             sleep 120 && \
              echo 'Verifying containers are running...' && \
              docker compose ps"
 
@@ -290,16 +290,36 @@ jobs:
             chmod -R ug+rwX /var/www/html/storage /var/www/html/bootstrap/cache
           "
           
-          # Install Composer dependencies FIRST (before any artisan commands)
-          echo "Installing Composer dependencies..."
-          for i in $(seq 1 5); do
-            if docker compose exec -T api composer install --prefer-dist --no-interaction --no-dev --optimize-autoloader; then
-              echo "✓ Composer dependencies installed successfully"
+          # Verify Composer dependencies are available
+          echo "Verifying Composer dependencies inside container..."
+          docker compose exec -T api test -f vendor/autoload.php && \
+          echo "✓ Composer dependencies verified" || \
+          echo "⚠️  Vendor not found, it may still be initializing (should complete on container startup)"
+          
+          # Wait for vendor/autoload.php to exist (composer install may be running in entrypoint)
+          echo "Waiting for composer dependencies to be fully initialized..."
+          attempt=0
+          max_attempts=60
+          while [ $attempt -lt $max_attempts ]; do
+            attempt=$((attempt+1))
+            if docker compose exec -T api test -f vendor/autoload.php 2>/dev/null; then
+              echo "✓ vendor/autoload.php is now available (attempt $attempt/$max_attempts)"
               break
             fi
-            echo "Attempt $i/5 failed, retrying in 5 seconds..."
-            sleep 5
+            
+            if [ $((attempt % 10)) -eq 0 ]; then
+              echo "Still waiting for composer... (attempt $attempt/$max_attempts)"
+            fi
+            
+            sleep 2
           done
+          
+          if [ $attempt -ge $max_attempts ]; then
+            echo "❌ ERROR: vendor/autoload.php not available after $((max_attempts * 2)) seconds"
+            echo "Container logs:"
+            docker compose logs --tail=50 api
+            exit 1
+          fi
           
           # Generate and set APP_KEY if not already set
           if ! grep -q '^APP_KEY=base64:' .env; then

@@ -47,8 +47,9 @@ RUN echo 'www-data ALL=(ALL) NOPASSWD: /usr/bin/certbot, /usr/sbin/nginx, /usr/s
 RUN cp .env.example .env && echo "APP_KEY=" >> .env
 
 # Instalar dependencias PHP con Composer
-RUN composer install --no-dev --optimize-autoloader --no-interaction --no-scripts \
-    && composer dump-autoload --no-dev --optimize
+RUN composer install --no-dev --optimize-autoloader --no-interaction \
+    && composer dump-autoload --no-dev --optimize \
+    && rm .env
 
 # Configurar Nginx para proxy a PHP-FPM en puerto 8000
 RUN mkdir -p /etc/nginx/sites-enabled /etc/nginx/sites-available && printf 'server {\n    listen 8000 default_server;\n    server_name _;\n    root /var/www/html/public;\n    index index.php index.html;\n    charset utf-8;\n    client_max_body_size 100M;\n\n    location / {\n        try_files $uri $uri/ /index.php?$query_string;\n    }\n\n    location ~ \.php$ {\n        fastcgi_pass 127.0.0.1:9000;\n        fastcgi_index index.php;\n        fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;\n        include fastcgi_params;\n    }\n\n    location ~ /\.(?!well-known).* {\n        deny all;\n    }\n}' > /etc/nginx/sites-available/default && \
@@ -63,8 +64,8 @@ RUN ln -sf /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default &
 # Configurar Supervisor para ejecutar PHP-FPM y Nginx (logs a stdout sin archivos)
 RUN printf '[supervisord]\nnodaemon=true\nsilent=true\npidfile=/tmp/supervisord.pid\nlogfile=/tmp/supervisord.log\n\n[program:php-fpm]\ncommand=/usr/local/sbin/php-fpm\nautorestart=unexpected\nstdout_logfile=/dev/stdout\nstdout_logfile_maxbytes=0\nstderr_logfile=/dev/stderr\nstderr_logfile_maxbytes=0\n\n[program:nginx]\ncommand=/usr/sbin/nginx -g "daemon off;"\nautorestart=unexpected\nstdout_logfile=/dev/stdout\nstdout_logfile_maxbytes=0\nstderr_logfile=/dev/stderr\nstderr_logfile_maxbytes=0' > /etc/supervisor/conf.d/laravel.conf
 
-# Script de entrada - solo PHP-FPM (Nginx está en el host)
-RUN printf '#!/bin/bash\nset -e\necho "======= SIMS Backend Initialization =========="\necho "→ Preparando directorios de Laravel..."\nmkdir -p bootstrap/cache storage/logs storage/framework/{cache,sessions,views,testing}\necho "→ Aplicando permisos..."\nchmod -R 775 storage bootstrap/cache 2>/dev/null || true\nchmod -R 777 bootstrap/cache 2>/dev/null || true\necho "✅ Directorios y permisos configurados correctamente"\necho "→ Iniciando PHP-FPM (escuchando en puerto 9000)..."\n/usr/local/sbin/php-fpm -F\n' > /usr/local/bin/entrypoint.sh && \
+# Script de entrada - verificar vendor y PHP-FPM
+RUN printf '#!/bin/bash\nset -e\necho "======= SIMS Backend Initialization =========="\necho "→ Preparando directorios de Laravel..."\nmkdir -p bootstrap/cache storage/logs storage/framework/{cache,sessions,views,testing}\necho "→ Aplicando permisos..."\nchmod -R 775 storage bootstrap/cache 2>/dev/null || true\nchmod -R 777 bootstrap/cache 2>/dev/null || true\n\n# Verificar que vendor existe\nif [ ! -d "vendor" ]; then\n  echo "⚠️  vendor directory not found, running composer install..."\n  composer install --prefer-dist --no-interaction --no-dev --optimize-autoloader || {\n    echo "❌ Composer install failed!"\n    exit 1\n  }\nfi\n\nif [ ! -f "vendor/autoload.php" ]; then\n  echo "❌ ERROR: vendor/autoload.php not found after composer install"\n  exit 1\nfi\n\necho "✅ Directorios, permisos y composer dependencies configurados correctamente"\necho "→ Iniciando PHP-FPM (escuchando en puerto 9000)..."\n/usr/local/sbin/php-fpm -F\n' > /usr/local/bin/entrypoint.sh && \
     chmod +x /usr/local/bin/entrypoint.sh
 
 # Exponer puerto 9000 (PHP-FPM)
