@@ -63,10 +63,10 @@ RUN ln -sf /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default &
 # Configurar Supervisor para ejecutar PHP-FPM y Nginx (logs a stdout sin archivos)
 RUN printf '[supervisord]\nnodaemon=true\nsilent=true\npidfile=/tmp/supervisord.pid\nlogfile=/tmp/supervisord.log\n\n[program:php-fpm]\ncommand=/usr/local/sbin/php-fpm\nautorestart=unexpected\nstdout_logfile=/dev/stdout\nstdout_logfile_maxbytes=0\nstderr_logfile=/dev/stderr\nstderr_logfile_maxbytes=0\n\n[program:nginx]\ncommand=/usr/sbin/nginx -g "daemon off;"\nautorestart=unexpected\nstdout_logfile=/dev/stdout\nstdout_logfile_maxbytes=0\nstderr_logfile=/dev/stderr\nstderr_logfile_maxbytes=0' > /etc/supervisor/conf.d/laravel.conf
 
-# Script de entrada - ejecutar solo PHP-FPM (sin Nginx, ya está en el host)
-RUN printf '#!/bin/bash\nset -e\n\necho "======= SIMS Backend Initialization =========="\n\necho "→ Preparando directorios de Laravel..."\n\n# Crear carpetas necesarias\nmkdir -p bootstrap/cache \\\n         storage/logs \\\n         storage/framework/cache \\\n         storage/framework/sessions \\\n         storage/framework/views \\\n         storage/framework/testing\n\n# Ajustar permisos con tolerancia a errores\necho "→ Aplicando permisos..."\nchmod -R 775 storage bootstrap/cache 2>/dev/null || true\nchmod -R 777 bootstrap/cache 2>/dev/null || true\n\necho "✅ Directorios y permisos configurados correctamente"\n\necho "→ Iniciando PHP-FPM (escuchando en puerto 9000)..."\necho "ℹ️  Nginx está siendo servido por el host"\n\n/usr/local/sbin/php-fpm -F\n' > /usr/local/bin/entrypoint.sh && \
+# Script de entrada - solo PHP-FPM (Nginx está en el host)
+RUN printf '#!/bin/bash\nset -e\necho "======= SIMS Backend Initialization =========="\necho "→ Preparando directorios de Laravel..."\nmkdir -p bootstrap/cache storage/logs storage/framework/{cache,sessions,views,testing}\necho "→ Aplicando permisos..."\nchmod -R 775 storage bootstrap/cache 2>/dev/null || true\nchmod -R 777 bootstrap/cache 2>/dev/null || true\necho "✅ Directorios y permisos configurados correctamente"\necho "→ Iniciando PHP-FPM (escuchando en puerto 9000)..."\n/usr/local/sbin/php-fpm -F\n' > /usr/local/bin/entrypoint.sh && \
     chmod +x /usr/local/bin/entrypoint.sh
 
-# Exponer puertos
-EXPOSE 8000 9000
+# Exponer puerto 9000 (PHP-FPM)
+EXPOSE 9000
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

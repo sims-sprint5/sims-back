@@ -51,9 +51,7 @@ services:
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://185.13.77.175,http://185.13.77.175:8000}
       CORS_ALLOWED_ORIGINS_PATTERNS: ${CORS_ALLOWED_ORIGINS_PATTERNS:-#^https?://[a-z0-9\-]+\.185\.13\.77\.175\.nip\.io(:\d+)?$#i}
     ports:
-      - "8000:8000"
-    volumes:
-      - .:/var/www/html
+      - "9000:9000"
     depends_on:
       - postgres
     networks:

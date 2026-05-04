@@ -1,0 +1,9 @@
+# Docker Compose Override for Local Development
+# This file is ONLY used locally (docker compose loads base + override automatically)
+# In production, only docker-compose.yml is used (no override)
+
+services:
+  api:
+    # Add bind mount for local development
+    volumes:
+      - .:/var/www/html
