@@ -53,7 +53,15 @@ jobs:
           "
 
       - name: Install dependencies
-        run: docker compose --env-file .env.ci run --rm --entrypoint "" api composer install --prefer-dist --no-interaction --no-progress
+        run: |
+          docker compose --env-file .env.ci run --rm --entrypoint "" -u root \
+            -e COMPOSER_HOME=/tmp/composer \
+            -e HOME=/tmp \
+            api bash -lc "
+              mkdir -p /tmp/composer /var/www/html && \
+              chown -R 0:0 /var/www/html && \
+              composer install --prefer-dist --no-interaction --no-progress
+            "
 
       - name: Generate APP_KEY and add to .env.ci
         run: |
