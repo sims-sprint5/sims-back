@@ -8,6 +8,8 @@ on:
 jobs:
   back-ci:
     runs-on: ubuntu-latest
+    env:
+      COMPOSE_FILE: docker-compose.yml
 
     steps:
       - name: Checkout code

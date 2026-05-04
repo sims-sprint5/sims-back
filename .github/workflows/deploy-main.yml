@@ -9,6 +9,8 @@ jobs:
   test:
     runs-on: ubuntu-latest
     name: Run Tests
+    env:
+      COMPOSE_FILE: docker-compose.yml
 
     steps:
       - name: Checkout code
@@ -81,6 +83,8 @@ jobs:
     runs-on: ubuntu-latest
     name: Deploy to Production Server
     if: success()
+    env:
+      COMPOSE_FILE: docker-compose.yml
 
     steps:
       - name: Checkout code
@@ -207,6 +211,7 @@ jobs:
         run: |
           ssh -p ${SSH_PORT:-22} -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" \
             "cd /var/www/sims-back && \
+             export COMPOSE_FILE=docker-compose.yml && \
              docker compose down --volumes --remove-orphans && \
              docker builder prune -af && \
              docker image prune -af && \
@@ -229,6 +234,7 @@ jobs:
           ssh -p ${SSH_PORT:-22} -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" << 'EOFSETUP'
           set -euo pipefail
           cd /var/www/sims-back
+          export COMPOSE_FILE=docker-compose.yml
           
           echo "========== DEBUG: Checking Docker state =========="
           docker compose ps
@@ -319,7 +325,7 @@ jobs:
           SSH_PORT: ${{ secrets.DEPLOY_PORT }}
         run: |
           ssh -p ${SSH_PORT:-22} -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" \
-            "cd /var/www/sims-back && sleep 10 && for i in \$(seq 1 5); do docker compose exec -T api php artisan migrate --force && break || sleep 5; done"
+            "cd /var/www/sims-back && export COMPOSE_FILE=docker-compose.yml && sleep 10 && for i in \$(seq 1 5); do docker compose exec -T api php artisan migrate --force && break || sleep 5; done"
 
       # TODO: Run tenant migrations for existing tenants (tenants created manually)
       # This step is commented out because tenants are created manually as per project requirement
@@ -331,7 +337,7 @@ jobs:
           SSH_PORT: ${{ secrets.DEPLOY_PORT }}
         run: |
           ssh -p ${SSH_PORT:-22} -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" \
-            "cd /var/www/sims-back && docker compose exec -T api php artisan db:seed --force"
+            "cd /var/www/sims-back && export COMPOSE_FILE=docker-compose.yml && docker compose exec -T api php artisan db:seed --force"
 
       - name: Ensure SuperAdmin exists and password matches env
         env:
@@ -341,6 +347,7 @@ jobs:
         run: |
           ssh -p ${SSH_PORT:-22} -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" \
             "cd /var/www/sims-back && \
+             export COMPOSE_FILE=docker-compose.yml && \
              docker compose exec -T api php artisan db:seed --class=SuperAdminSeeder --force"
 
       - name: Restart containers
@@ -350,7 +357,7 @@ jobs:
           SSH_PORT: ${{ secrets.DEPLOY_PORT }}
         run: |
           ssh -p ${SSH_PORT:-22} -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" \
-            "cd /var/www/sims-back && docker compose restart"
+            "cd /var/www/sims-back && export COMPOSE_FILE=docker-compose.yml && docker compose restart"
 
       - name: Verify deployment
         env:
@@ -360,5 +367,6 @@ jobs:
         run: |
           ssh -p ${SSH_PORT:-22} -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" \
             "cd /var/www/sims-back && \
+             export COMPOSE_FILE=docker-compose.yml && \
              docker ps --filter label=com.docker.compose.project=sims-back && \
              docker compose exec -T api php artisan about >/dev/null || (docker compose logs --tail 200 api && exit 1)"
