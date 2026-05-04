@@ -4,7 +4,7 @@
 # ======================================
 
 # ===== STAGE 1: Builder (instalar Composer) =====
-FROM php:8.4-fpm as builder
+FROM php:8.4-fpm AS builder
 
 # Instalar solo lo necesario para Composer
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -41,7 +41,12 @@ FROM php:8.4-fpm
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     git \
+    unzip \
+    zip \
     && rm -rf /var/lib/apt/lists/*
+
+# Instalar Composer en runtime (requerido por CI)
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
 # Crear usuario no-root (laravel con UID 1000)
 RUN useradd -m -u 1000 laravel
@@ -61,7 +66,7 @@ RUN mkdir -p bootstrap/cache storage/logs \
     && chmod -R 775 bootstrap storage
 
 # Crear entrypoint (verificación de vendor + PHP-FPM)
-RUN printf '#!/bin/bash\nset -e\n\necho "=== Laravel Application Startup ==="\n\n# Verificar vendor/autoload.php\nif [ ! -f vendor/autoload.php ]; then\n  echo "ERROR: vendor/autoload.php not found!"\n  echo "Directory contents:"\n  ls -la vendor/ 2>/dev/null || echo "vendor directory missing"\n  exit 1\nfi\n\necho "✓ vendor/autoload.php verified"\necho "✓ Starting PHP-FPM on port 9000..."\n\nexec /usr/local/sbin/php-fpm -F\n' > /usr/local/bin/entrypoint.sh && chmod +x /usr/local/bin/entrypoint.sh
+RUN printf '#!/bin/bash\nset -e\n\necho "=== Laravel Application Startup ==="\n\n# Verificar vendor/autoload.php\nif [ ! -f vendor/autoload.php ]; then\n  echo "ERROR: vendor/autoload.php not found!"\n  echo "Directory contents:"\n  ls -la vendor/ 2>/dev/null || echo "vendor directory missing"\n  exit 1\nfi\n\n# Si se pasan comandos, ejecutarlos tal cual (para CI y artisan/composer)\nif [ "$#" -gt 0 ]; then\n  exec "$@"\nfi\n\necho "✓ vendor/autoload.php verified"\necho "✓ Starting PHP-FPM on port 9000..."\n\nexec /usr/local/sbin/php-fpm -F\n' > /usr/local/bin/entrypoint.sh && chmod +x /usr/local/bin/entrypoint.sh
 
 # Cambiar a usuario no-root para runtime
 USER laravel
