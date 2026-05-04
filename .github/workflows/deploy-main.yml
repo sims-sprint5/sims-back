@@ -37,7 +37,7 @@ jobs:
 
       - name: Ensure storage and cache dirs exist
         run: |
-          docker compose --env-file .env.ci run --rm api bash -lc "
+          docker compose --env-file .env.ci run --rm --entrypoint "" api bash -lc "
             mkdir -p bootstrap/cache \
               storage/logs \
               storage/framework/cache \
@@ -48,26 +48,26 @@ jobs:
           "
 
       - name: Install dependencies
-        run: docker compose --env-file .env.ci run --rm api composer install --prefer-dist --no-interaction --no-progress
+        run: docker compose --env-file .env.ci run --rm --entrypoint "" api composer install --prefer-dist --no-interaction --no-progress
 
       - name: Generate APP_KEY and add to .env.ci
         run: |
-          KEY=$(docker compose --env-file .env.ci run --rm -e APP_ENV=testing api php artisan key:generate --show)
+          KEY=$(docker compose --env-file .env.ci run --rm --entrypoint "" -e APP_ENV=testing api php artisan key:generate --show)
           echo "APP_KEY=$KEY" >> .env.ci
 
       - name: Run Pint
-        run: docker compose --env-file .env.ci run --rm api vendor/bin/pint --test
+        run: docker compose --env-file .env.ci run --rm --entrypoint "" api vendor/bin/pint --test
 
       - name: Run migrations (retry until DB ready)
         run: |
-          docker compose --env-file .env.ci run --rm -e APP_ENV=testing api bash -lc '
+          docker compose --env-file .env.ci run --rm --entrypoint "" -e APP_ENV=testing api bash -lc '
             for i in $(seq 1 30); do
               php artisan migrate --no-interaction && break || sleep 2;
             done
           '
 
       - name: Run tests
-        run: docker compose --env-file .env.ci run --rm -e APP_ENV=testing api php artisan test
+        run: docker compose --env-file .env.ci run --rm --entrypoint "" -e APP_ENV=testing api php artisan test
 
       - name: Tear down Docker Compose
         if: always()
