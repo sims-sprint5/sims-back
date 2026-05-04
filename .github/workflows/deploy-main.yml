@@ -21,8 +21,6 @@ jobs:
 
       - name: Create CI env file for docker-compose
         run: |
-          RUNNER_UID=$(id -u)
-          RUNNER_GID=$(id -g)
           printf '%s\n' \
             "DB_USERNAME=postgres" \
             "DB_PASSWORD=postgres" \
@@ -31,8 +29,8 @@ jobs:
             "APP_ENV=testing" \
             "PGADMIN_EMAIL=ci@example.com" \
             "PGADMIN_PASSWORD=ci-password" \
-            "UID=${RUNNER_UID}" \
-            "GID=${RUNNER_GID}" > .env.ci
+            "UID=0" \
+            "GID=0" > .env.ci
 
       - name: Build Docker image
         run: docker compose --env-file .env.ci build api
