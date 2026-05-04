@@ -44,6 +44,18 @@ jobs:
             exit 1
           '
 
+      - name: Ensure storage and cache dirs exist
+        run: |
+          docker compose --env-file .env.ci run --rm --entrypoint "" -u root api bash -lc "
+            mkdir -p bootstrap/cache \
+              storage/logs \
+              storage/framework/cache \
+              storage/framework/sessions \
+              storage/framework/testing \
+              storage/framework/views \
+            && chmod -R 775 bootstrap/cache storage
+          "
+
       - name: Fix git safe.directory
         run: docker compose --env-file .env.ci run --rm api git config --global --add safe.directory /var/www/html
 

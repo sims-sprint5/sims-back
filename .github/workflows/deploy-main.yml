@@ -42,7 +42,7 @@ jobs:
 
       - name: Ensure storage and cache dirs exist
         run: |
-          docker compose --env-file .env.ci run --rm --entrypoint "" api bash -lc "
+          docker compose --env-file .env.ci run --rm --entrypoint "" -u root api bash -lc "
             mkdir -p bootstrap/cache \
               storage/logs \
               storage/framework/cache \
