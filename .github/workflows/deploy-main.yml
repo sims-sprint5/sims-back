@@ -304,6 +304,15 @@ jobs:
           docker compose exec -T api php artisan config:cache
           EOFSETUP
 
+      - name: Install Composer dependencies
+        env:
+          SSH_USER: ${{ secrets.DEPLOY_USER }}
+          SSH_HOST: ${{ secrets.DEPLOY_HOST }}
+          SSH_PORT: ${{ secrets.DEPLOY_PORT }}
+        run: |
+          ssh -p ${SSH_PORT:-22} -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" \
+            "cd /var/www/sims-back && for i in \$(seq 1 5); do docker compose exec -T api composer install --prefer-dist --no-interaction && break || sleep 5; done"
+
       - name: Run Laravel migrations
         env:
           SSH_USER: ${{ secrets.DEPLOY_USER }}
