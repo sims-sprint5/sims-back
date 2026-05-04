@@ -21,12 +21,14 @@ jobs:
 
       - name: Create CI env file for docker-compose
         run: |
+          APP_KEY=$(php -r 'echo "base64:".base64_encode(random_bytes(32));')
           printf '%s\n' \
             "DB_USERNAME=postgres" \
             "DB_PASSWORD=postgres" \
             "DB_DATABASE=sims_test" \
             "DB_PORT=5432" \
             "APP_ENV=testing" \
+            "APP_KEY=$APP_KEY" \
             "PGADMIN_EMAIL=ci@example.com" \
             "PGADMIN_PASSWORD=ci-password" \
             "UID=0" \
@@ -63,11 +65,6 @@ jobs:
               chown -R 0:0 /var/www/html && \
               composer install --prefer-dist --no-interaction --no-progress
             "
-
-      - name: Generate APP_KEY and add to .env.ci
-        run: |
-          KEY=$(docker compose --env-file .env.ci exec -T -e APP_ENV=testing api php artisan key:generate --show)
-          echo "APP_KEY=$KEY" >> .env.ci
 
       - name: Run Pint
         run: docker compose --env-file .env.ci exec -T api vendor/bin/pint --test
