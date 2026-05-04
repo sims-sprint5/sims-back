@@ -255,7 +255,7 @@ jobs:
           
           # Check processes inside container
           echo "========== DEBUG: Checking Supervisor inside container =========="
-          docker compose exec -T api ps aux | grep -E "supervisor|php-fpm|nginx|artisan" || echo "No supervisor/php-fpm running"
+          docker compose exec -T api ps aux | grep -E "supervisor|php-fpm|artisan" || echo "No supervisor/php-fpm running"
           echo ""
           
           # Wait for PHP-FPM to be ready (up to 90 seconds)
