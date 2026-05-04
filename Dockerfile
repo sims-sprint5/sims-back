@@ -1,12 +1,13 @@
 # ======================================
-# Dockerfile para Laravel 12 API + Sanctum + Spatie
-# Base: PHP 8.4-FPM + Nginx + Supervisor
+# Dockerfile para Laravel 12 API
+# Multi-stage: Builder + Runtime (PHP-FPM)
 # ======================================
 
-FROM php:8.4-fpm
+# ===== STAGE 1: Builder (instalar Composer) =====
+FROM php:8.4-fpm as builder
 
-# Instalar dependencias del sistema
-RUN apt-get update && apt-get install -y \
+# Instalar solo lo necesario para Composer
+RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     curl \
     unzip \
@@ -14,60 +15,62 @@ RUN apt-get update && apt-get install -y \
     libpq-dev \
     libzip-dev \
     libonig-dev \
-    certbot \
-    python3-certbot-nginx \
-    nginx \
-    supervisor \
-    sudo \
     && docker-php-ext-install pdo_pgsql mbstring zip \
     && rm -rf /var/lib/apt/lists/*
 
 # Instalar Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Definir directorio de trabajo
+WORKDIR /build
+
+# Copiar solo archivos de dependencias (aprovecha docker cache)
+COPY composer.json composer.lock ./
+
+# Instalar dependencias (como root, sin restricciones)
+RUN composer install \
+    --prefer-dist \
+    --no-dev \
+    --no-interaction \
+    --optimize-autoloader \
+    --no-scripts
+
+# ===== STAGE 2: Runtime (aplicación final) =====
+FROM php:8.4-fpm
+
+# Instalar solo dependencias de runtime
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq5 \
+    libzip4 \
+    libonig5 \
+    curl \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Instalar extensiones PHP
+RUN docker-php-ext-install pdo_pgsql mbstring zip
+
+# Crear usuario no-root (laravel con UID 1000)
+RUN useradd -m -u 1000 laravel
+
 WORKDIR /var/www/html
 
-# Copiar toda la aplicación al contenedor
-COPY . .
+# Copiar vendor desde builder (respeta ownership)
+COPY --from=builder --chown=laravel:laravel /build/vendor ./vendor
 
-# Asegurar que www-data es propietario de todo y dar permisos
-RUN chown -R www-data:www-data . && \
-    mkdir -p storage/logs bootstrap/cache \
-      /var/lib/nginx/body /var/lib/nginx/fastcgi_temp \
-      /var/lib/nginx/proxy_temp /var/lib/nginx/scgi_temp \
-      /var/lib/nginx/uwsgi_temp /var/lib/nginx/client_body_temp && \
-    chown -R www-data:www-data /var/lib/nginx && \
-    chmod -R 775 storage bootstrap /var/lib/nginx
+# Copiar código de aplicación
+COPY --chown=laravel:laravel . .
 
-# Allow www-data to run certbot, nginx, service
-RUN echo 'www-data ALL=(ALL) NOPASSWD: /usr/bin/certbot, /usr/sbin/nginx, /usr/sbin/service' >> /etc/sudoers
+# Crear directorios de storage y bootstrap con permisos correctos
+RUN mkdir -p bootstrap/cache storage/logs \
+    storage/framework/{cache,sessions,views,testing} \
+    && chown -R laravel:laravel bootstrap storage \
+    && chmod -R 775 bootstrap storage
 
-# Crear .env temporal para el build
-RUN cp .env.example .env && echo "APP_KEY=" >> .env
+# Crear entrypoint (verificación de vendor + PHP-FPM)
+RUN printf '#!/bin/bash\nset -e\n\necho "=== Laravel Application Startup ==="\n\n# Verificar vendor/autoload.php\nif [ ! -f vendor/autoload.php ]; then\n  echo "ERROR: vendor/autoload.php not found!"\n  echo "Directory contents:"\n  ls -la vendor/ 2>/dev/null || echo "vendor directory missing"\n  exit 1\nfi\n\necho "✓ vendor/autoload.php verified"\necho "✓ Starting PHP-FPM on port 9000..."\n\nexec /usr/local/sbin/php-fpm -F\n' > /usr/local/bin/entrypoint.sh && chmod +x /usr/local/bin/entrypoint.sh
 
-# Instalar dependencias PHP con Composer
-RUN composer install --no-dev --optimize-autoloader --no-interaction \
-    && composer dump-autoload --no-dev --optimize \
-    && rm .env
+# Cambiar a usuario no-root para runtime
+USER laravel
 
-# Configurar Nginx para proxy a PHP-FPM en puerto 8000
-RUN mkdir -p /etc/nginx/sites-enabled /etc/nginx/sites-available && printf 'server {\n    listen 8000 default_server;\n    server_name _;\n    root /var/www/html/public;\n    index index.php index.html;\n    charset utf-8;\n    client_max_body_size 100M;\n\n    location / {\n        try_files $uri $uri/ /index.php?$query_string;\n    }\n\n    location ~ \.php$ {\n        fastcgi_pass 127.0.0.1:9000;\n        fastcgi_index index.php;\n        fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;\n        include fastcgi_params;\n    }\n\n    location ~ /\.(?!well-known).* {\n        deny all;\n    }\n}' > /etc/nginx/sites-available/default && \
-    ln -sf /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default && \
-    sed -i 's/^user nginx;/user www-data;/' /etc/nginx/nginx.conf && \
-    sed -i 's/^    worker_processes auto;/    worker_processes 2;/' /etc/nginx/nginx.conf
-
-RUN ln -sf /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default && \
-    sed -i 's/^user nginx;/user www-data;/' /etc/nginx/nginx.conf && \
-    sed -i 's/^    worker_processes auto;/    worker_processes 2;/' /etc/nginx/nginx.conf
-
-# Configurar Supervisor para ejecutar PHP-FPM y Nginx (logs a stdout sin archivos)
-RUN printf '[supervisord]\nnodaemon=true\nsilent=true\npidfile=/tmp/supervisord.pid\nlogfile=/tmp/supervisord.log\n\n[program:php-fpm]\ncommand=/usr/local/sbin/php-fpm\nautorestart=unexpected\nstdout_logfile=/dev/stdout\nstdout_logfile_maxbytes=0\nstderr_logfile=/dev/stderr\nstderr_logfile_maxbytes=0\n\n[program:nginx]\ncommand=/usr/sbin/nginx -g "daemon off;"\nautorestart=unexpected\nstdout_logfile=/dev/stdout\nstdout_logfile_maxbytes=0\nstderr_logfile=/dev/stderr\nstderr_logfile_maxbytes=0' > /etc/supervisor/conf.d/laravel.conf
-
-# Script de entrada - verificar vendor y PHP-FPM
-RUN printf '#!/bin/bash\nset -e\necho "======= SIMS Backend Initialization =========="\necho "→ Preparando directorios de Laravel..."\nmkdir -p bootstrap/cache storage/logs storage/framework/{cache,sessions,views,testing}\necho "→ Aplicando permisos..."\nchmod -R 775 storage bootstrap/cache 2>/dev/null || true\nchmod -R 777 bootstrap/cache 2>/dev/null || true\n\n# Verificar que vendor existe\nif [ ! -d "vendor" ]; then\n  echo "⚠️  vendor directory not found, running composer install..."\n  composer install --prefer-dist --no-interaction --no-dev --optimize-autoloader || {\n    echo "❌ Composer install failed!"\n    exit 1\n  }\nfi\n\nif [ ! -f "vendor/autoload.php" ]; then\n  echo "❌ ERROR: vendor/autoload.php not found after composer install"\n  exit 1\nfi\n\necho "✅ Directorios, permisos y composer dependencies configurados correctamente"\necho "→ Iniciando PHP-FPM (escuchando en puerto 9000)..."\n/usr/local/sbin/php-fpm -F\n' > /usr/local/bin/entrypoint.sh && \
-    chmod +x /usr/local/bin/entrypoint.sh
-
-# Exponer puerto 9000 (PHP-FPM)
 EXPOSE 9000
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
