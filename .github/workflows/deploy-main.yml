@@ -290,6 +290,17 @@ jobs:
             chmod -R ug+rwX /var/www/html/storage /var/www/html/bootstrap/cache
           "
           
+          # Install Composer dependencies FIRST (before any artisan commands)
+          echo "Installing Composer dependencies..."
+          for i in $(seq 1 5); do
+            if docker compose exec -T api composer install --prefer-dist --no-interaction --no-dev --optimize-autoloader; then
+              echo "✓ Composer dependencies installed successfully"
+              break
+            fi
+            echo "Attempt $i/5 failed, retrying in 5 seconds..."
+            sleep 5
+          done
+          
           # Generate and set APP_KEY if not already set
           if ! grep -q '^APP_KEY=base64:' .env; then
             KEY=$(docker compose exec -T api php artisan key:generate --show)
@@ -303,15 +314,6 @@ jobs:
           docker compose exec -T api php artisan view:clear
           docker compose exec -T api php artisan config:cache
           EOFSETUP
-
-      - name: Install Composer dependencies
-        env:
-          SSH_USER: ${{ secrets.DEPLOY_USER }}
-          SSH_HOST: ${{ secrets.DEPLOY_HOST }}
-          SSH_PORT: ${{ secrets.DEPLOY_PORT }}
-        run: |
-          ssh -p ${SSH_PORT:-22} -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" \
-            "cd /var/www/sims-back && for i in \$(seq 1 5); do docker compose exec -T api composer install --prefer-dist --no-interaction && break || sleep 5; done"
 
       - name: Run Laravel migrations
         env:
