@@ -37,12 +37,16 @@ RUN composer install \
 # ===== STAGE 2: Runtime (aplicación final) =====
 FROM php:8.4-fpm
 
-# Solo instalar herramientas essentials (php-fpm ya tiene librerías compiladas)
+# Solo instalar herramientas essentials y extensiones necesarias
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     git \
     unzip \
     zip \
+    libpq-dev \
+    libzip-dev \
+    libonig-dev \
+    && docker-php-ext-install pdo_pgsql mbstring zip \
     && rm -rf /var/lib/apt/lists/*
 
 # Instalar Composer en runtime (requerido por CI)
