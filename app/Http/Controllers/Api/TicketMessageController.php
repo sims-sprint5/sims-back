@@ -87,7 +87,6 @@ class TicketMessageController extends Controller
             'is_admin' => $this->isAdmin($request),  // calculated from the token
         ]);
 
-        $ticketMessage->forceFill(['created_at' => now()])->save();
         $ticketMessage->load('user');
 
         return response()->json([

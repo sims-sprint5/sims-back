@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class ChatController extends Controller
 {
@@ -78,11 +79,14 @@ PROMPT;
             ]);
 
             if ($response->failed()) {
-                $errorMsg = $response->json('error.message') ?? $response->body();
-                \Log::error('Groq API failed: '.$response->status().' - '.$errorMsg);
+                $errorMsg = (string) ($response->json('error.message') ?? 'Groq API error');
+                Log::error('Groq API failed.', [
+                    'status' => $response->status(),
+                    'message' => $errorMsg,
+                ]);
 
                 return response()->json([
-                    'error' => 'Error al conectar con Groq: '.$errorMsg,
+                    'error' => 'Error al conectar con el servei de xat. Torna-ho a provar mes tard.',
                     'status' => $response->status(),
                 ], 500);
             }
@@ -95,11 +99,12 @@ PROMPT;
             ]);
 
         } catch (\Exception $e) {
-            $errorMsg = $e->getMessage();
-            \Log::error('Chatbot error: '.$errorMsg);
+            Log::error('Chatbot error.', [
+                'error' => $e->getMessage(),
+            ]);
 
             return response()->json([
-                'error' => 'Error: '.$errorMsg,
+                'error' => 'Error al connectar amb el servei de xat. Torna-ho a provar mes tard.',
             ], 500);
         }
     }

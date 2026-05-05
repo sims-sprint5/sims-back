@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Central;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Console\Kernel;
+use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Http\Request;
 
 class CertificateController extends Controller

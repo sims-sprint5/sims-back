@@ -28,6 +28,17 @@ class StripeCheckoutService
 
     public function createCheckoutSession(Reservation $reservation, float $priceEur): Session
     {
+        /** @var array<string, mixed> $payload */
+        $payload = $this->buildCheckoutPayloadFromReservation($reservation, $priceEur);
+
+        return $this->client->checkout->sessions->create($payload);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function buildCheckoutPayloadFromReservation(Reservation $reservation, float $priceEur): array
+    {
         $reservationId = (string) $reservation->getKey();
         $currency = strtolower((string) config('services.stripe.currency', 'eur'));
         $unitAmount = (int) round($priceEur * 100);
@@ -39,7 +50,18 @@ class StripeCheckoutService
         $successUrl = $this->resolveTenantCheckoutUrl((string) config('services.stripe.success_url'));
         $cancelUrl = $this->resolveTenantCheckoutUrl((string) config('services.stripe.cancel_url'));
 
-        $lineItem = [
+        $lineItem = $this->buildLineItem($reservationId, $currency, $unitAmount);
+        $metadata = $this->buildMetadata($reservation);
+
+        return $this->buildCheckoutPayload($successUrl, $cancelUrl, $lineItem, $metadata);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function buildLineItem(string $reservationId, string $currency, int $unitAmount): array
+    {
+        return [
             'quantity' => 1,
             'price_data' => [
                 'currency' => $currency,
@@ -50,14 +72,32 @@ class StripeCheckoutService
                 ],
             ],
         ];
+    }
 
-        $metadata = [
-            'reservation_id' => $reservationId,
+    /**
+     * @return array<string, mixed>
+     */
+    private function buildMetadata(Reservation $reservation): array
+    {
+        return [
+            'reservation_id' => (string) $reservation->getKey(),
             'user_id' => (string) $reservation->user_id,
             'vehicle_id' => (string) $reservation->vehicle_id,
         ];
+    }
 
-        $payload = [
+    /**
+     * @param array<string, mixed> $lineItem
+     * @param array<string, mixed> $metadata
+     * @return array<string, mixed>
+     */
+    private function buildCheckoutPayload(
+        string $successUrl,
+        string $cancelUrl,
+        array $lineItem,
+        array $metadata
+    ): array {
+        return [
             'mode' => 'payment',
             'success_url' => $successUrl,
             'cancel_url' => $cancelUrl,
@@ -65,8 +105,6 @@ class StripeCheckoutService
             'line_items' => [$lineItem],
             'metadata' => $metadata,
         ];
-
-        return $this->client->checkout->sessions->create($payload);
     }
 
     public function resolveReservationPrice(): float

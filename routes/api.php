@@ -5,10 +5,6 @@ use App\Http\Controllers\Central\SuperAdminController;
 use App\Http\Controllers\Central\TenantController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/ping', function () {
-    return response()->json(['status' => 'ok']);
-});
-
 // Health check
 Route::get('/ping', fn () => response()->json(['status' => 'ok', 'timestamp' => now()]));
 
