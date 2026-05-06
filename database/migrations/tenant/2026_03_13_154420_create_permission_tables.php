@@ -1,5 +1,4 @@
 <?php
-
 declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
@@ -142,4 +141,4 @@ final class CreatePermissionTables extends Migration
     }
 }
 
-return new CreatePermissionTables();
+return new \CreatePermissionTables();
