@@ -104,3 +104,6 @@ TESTING_GUIDE.md
 FRONTEND_SETUP.md
 API_DOCKER_FIX.md
 ERROR_CHOWN_CI.md
+errors.md
+
+tenant-migration-issues.md
