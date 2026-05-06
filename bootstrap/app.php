@@ -54,11 +54,22 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->render(function (TenantCouldNotBeIdentifiedOnDomainException $e, Request $request) {
-            if ($request->is('api/*')) {
-                return response()->json([
-                    'message' => 'Tenant not found for this domain.',
-                ], 404);
+            if (! $request->is('api/*')) {
+                return null;
             }
+
+            // When a bearer token is present on a non-superadmin tenant endpoint,
+            // the caller is most likely a SuperAdmin whose dashboard requests tenant
+            // resource APIs from the central domain (e.g. Navbar loading vehicle stats).
+            // Return empty paginated data so the UI stays silent instead of showing
+            // a 404 console error.
+            if ($request->bearerToken() && ! $request->is('api/v1/superadmin/*')) {
+                return response()->json(['data' => []], 200);
+            }
+
+            return response()->json([
+                'message' => 'Tenant not found for this domain.',
+            ], 404);
         });
 
         $exceptions->render(function (NotASubdomainException $e, Request $request) {
