@@ -65,7 +65,10 @@ return Application::configure(basePath: dirname(__DIR__))
             // even when no tenant subdomain is present. For tenant API calls
             // accessed through the central domain, return 404 to indicate
             // tenant not found.
-            if ($request->is('api/v1/superadmin/*') || $request->is('api/v1/superadmin') || $request->is('api/v1/superadmin/auth/*') || $request->is('api/v1/superadmin/auth')) {
+            if ($request->is('api/v1/superadmin/*')
+                || $request->is('api/v1/superadmin')
+                || $request->is('api/v1/superadmin/auth/*')
+                || $request->is('api/v1/superadmin/auth')) {
                 return null; // let the request proceed as central
             }
 
