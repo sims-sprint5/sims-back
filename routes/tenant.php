@@ -13,12 +13,10 @@ use App\Http\Controllers\Api\TicketMessageController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\VehicleController;
 use Illuminate\Support\Facades\Route;
-use Stancl\Tenancy\Middleware\InitializeTenancyBySubdomain;
-use Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains;
+use Stancl\Tenancy\Middleware\InitializeTenancyByDomain;
 
 Route::prefix('api')->middleware([
-    InitializeTenancyBySubdomain::class,
-    PreventAccessFromCentralDomains::class,
+    InitializeTenancyByDomain::class,
     'api',
 ])->group(function () {
 

@@ -205,16 +205,26 @@ jobs:
             exit 1
           fi
 
-          set_env TENANT_BASE_DOMAIN "$app_domain"
-          set_env SESSION_DOMAIN ".$app_domain"
+          # TENANT_BASE_DOMAIN must be set explicitly in .env on the server.
+          # It differs from APP_DOMAIN: APP_DOMAIN is the central/SuperAdmin host
+          # (e.g. jilsoftwares.example.com) while TENANT_BASE_DOMAIN is the parent
+          # domain used to build tenant subdomains (e.g. example.com so tenants
+          # become aaa.example.com, covered by *.example.com wildcard cert).
+          # Only set a default if the value is completely missing.
+          set_env_if_missing TENANT_BASE_DOMAIN "$app_domain"
 
-          sanctum_domains="${app_domain},,.${app_domain}",185.13.77.175,185.13.77.175:8000
-          set_env SANCTUM_STATEFUL_DOMAINS "$sanctum_domains",http://185.13.77.175,http://185.13.77.175:8000
+          tenant_base_domain="$(grep '^TENANT_BASE_DOMAIN=' .env | head -n1 | cut -d= -f2- | tr -d '\r' || true)"
+          [ -n "$tenant_base_domain" ] || tenant_base_domain="$app_domain"
+
+          set_env SESSION_DOMAIN ".$tenant_base_domain"
+
+          sanctum_domains="${app_domain},.${tenant_base_domain},185.13.77.175,185.13.77.175:8000"
+          set_env SANCTUM_STATEFUL_DOMAINS "$sanctum_domains"
 
           cors_origins="https://${app_domain}"
           set_env CORS_ALLOWED_ORIGINS "$cors_origins"
 
-          cors_pattern="#^https?://[a-z0-9-]+[.]${app_domain//./[.]}(:[0-9]+)?\$#i"
+          cors_pattern="#^https?://[a-z0-9-]+[.]${tenant_base_domain//./[.]}(:[0-9]+)?\$#i"
           set_env CORS_ALLOWED_ORIGINS_PATTERNS "$cors_pattern"
 
           # SuperAdmin credentials (only set defaults when missing)
@@ -350,8 +360,19 @@ jobs:
           ssh -p ${SSH_PORT:-22} -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" \
             "cd /var/www/sims-back && export COMPOSE_FILE=docker-compose.yml && sleep 10 && for i in \$(seq 1 5); do docker compose exec -T api php artisan migrate --force && break || sleep 5; done"
 
-      # TODO: Run tenant migrations for existing tenants (tenants created manually)
-      # This step is commented out because tenants are created manually as per project requirement
+      - name: Run tenant migrations for initial tenant
+        env:
+          SSH_USER: ${{ secrets.DEPLOY_USER }}
+          SSH_HOST: ${{ secrets.DEPLOY_HOST }}
+          SSH_PORT: ${{ secrets.DEPLOY_PORT }}
+        run: |
+          ssh -p ${SSH_PORT:-22} -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" \
+            "cd /var/www/sims-back && export COMPOSE_FILE=docker-compose.yml && \
+             TENANT_ID=\$(grep '^INITIAL_TENANT_ID=' .env | cut -d= -f2- | tr -d '\r' || true) && \
+             if [ -n \"\$TENANT_ID\" ]; then \
+               docker compose exec -T api php artisan db:seed --class=InitialTenantSeeder --force && \
+               docker compose exec -T api php artisan tenants:migrate --tenants=\"\$TENANT_ID\" --force; \
+             else echo 'INITIAL_TENANT_ID not set, skipping tenant setup'; fi"
 
       - name: Run Laravel seeders
         env:

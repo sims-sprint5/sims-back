@@ -24,12 +24,10 @@ return [
      *
      * Only relevant if you're using the domain or subdomain identification middleware.
      */
-    'central_domains' => array_filter([
+    'central_domains' => [
         '127.0.0.1',
         'localhost',
-        env('TENANT_BASE_DOMAIN'),
-        env('APP_DOMAIN'),
-    ]),
+    ],
 
     /**
      * Tenancy bootstrappers are executed when tenancy is initialized.
@@ -148,22 +146,6 @@ return [
          * where you want to use tenant-specific assets (product images, avatars, etc).
          */
         'asset_helper_tenancy' => true,
-    ],
-
-    /**
-     * Redis tenancy config. Used by RedisTenancyBootstrapper.
-     *
-     * Note: You need phpredis to use Redis tenancy.
-     *
-     * Note: You don't need to use this if you're using Redis only for cache.
-     * Redis tenancy is only relevant if you're making direct Redis calls,
-     * either using the Redis facade or by injecting it as a dependency.
-     */
-    'redis' => [
-        'prefix_base' => 'tenant', // Each key in Redis will be prepended by this prefix_base, followed by the tenant id.
-        'prefixed_connections' => [ // Redis connections whose keys are prefixed, to separate one tenant's keys from another.
-            // 'default',
-        ],
     ],
 
     /**

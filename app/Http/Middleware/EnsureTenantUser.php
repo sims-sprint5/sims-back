@@ -18,7 +18,9 @@ class EnsureTenantUser
     public function handle(Request $request, Closure $next): Response
     {
         if (! $request->user() instanceof User) {
-            return response()->json(['message' => 'Unauthorized.'], 401);
+            // Return 403 (not 401) so the frontend's global 401-logout interceptor
+            // is not triggered when a SuperAdmin token is used on a tenant route.
+            return response()->json(['message' => 'Unauthorized.'], 403);
         }
 
         return $next($request);

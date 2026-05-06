@@ -20,6 +20,7 @@ use Stancl\Tenancy\Exceptions\NotASubdomainException;
 use Stancl\Tenancy\Exceptions\TenantCouldNotBeIdentifiedOnDomainException;
 use Stancl\Tenancy\Middleware\InitializeTenancyBySubdomain;
 use Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -82,6 +83,12 @@ return Application::configure(basePath: dirname(__DIR__))
         });
 
         $exceptions->render(function (AuthenticationException $e, Request $request) {
+            if ($request->is('api/*') && $request->bearerToken() && tenant() !== null) {
+                // Bearer token present but invalid in tenant schema (e.g. central SuperAdmin token
+                // used on a tenant route). Return 403 instead of 401 to avoid triggering the
+                // frontend's global logout interceptor.
+                return response()->json(['message' => 'Unauthorized for this context.'], 403);
+            }
             return response()->json(['message' => 'Unauthenticated.'], 401);
         });
 
@@ -123,6 +130,11 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $exceptions->render(function (Throwable $e, Request $request) {
             if (! $request->is('api/*')) {
+                return null;
+            }
+
+            // HTTP exceptions (404, 405, etc.) should keep their proper status code
+            if ($e instanceof HttpExceptionInterface) {
                 return null;
             }
 
