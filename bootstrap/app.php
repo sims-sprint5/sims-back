@@ -100,6 +100,7 @@ return Application::configure(basePath: dirname(__DIR__))
                 // frontend's global logout interceptor.
                 return response()->json(['message' => 'Unauthorized for this context.'], 403);
             }
+
             return response()->json(['message' => 'Unauthenticated.'], 401);
         });
 
