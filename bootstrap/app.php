@@ -17,6 +17,7 @@ use Spatie\Permission\Middleware\PermissionMiddleware;
 use Spatie\Permission\Middleware\RoleMiddleware;
 use Spatie\Permission\Middleware\RoleOrPermissionMiddleware;
 use Stancl\Tenancy\Exceptions\TenantCouldNotBeIdentifiedOnDomainException;
+use Stancl\Tenancy\Exceptions\NotASubdomainException;
 use Stancl\Tenancy\Middleware\InitializeTenancyBySubdomain;
 use Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains;
 
@@ -57,6 +58,24 @@ return Application::configure(basePath: dirname(__DIR__))
                     'message' => 'Tenant not found for this domain.',
                 ], 404);
             }
+        });
+
+        $exceptions->render(function (NotASubdomainException $e, Request $request) {
+            // Requests to central (superadmin) API endpoints should be allowed
+            // even when no tenant subdomain is present. For tenant API calls
+            // accessed through the central domain, return 404 to indicate
+            // tenant not found.
+            if ($request->is('api/v1/superadmin/*') || $request->is('api/v1/superadmin') || $request->is('api/v1/superadmin/auth/*') || $request->is('api/v1/superadmin/auth')) {
+                return null; // let the request proceed as central
+            }
+
+            if ($request->is('api/*')) {
+                return response()->json([
+                    'message' => 'Tenant not found for this domain.',
+                ], 404);
+            }
+
+            return null;
         });
 
         $exceptions->render(function (AuthenticationException $e, Request $request) {
