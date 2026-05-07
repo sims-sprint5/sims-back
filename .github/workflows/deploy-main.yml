@@ -8,400 +8,190 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    name: Run Tests
-    env:
-      COMPOSE_FILE: docker-compose.yml
+    name: Lint & Tests
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: sims_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Clean up previous Docker containers
-        run: docker compose --env-file .env.example down -v --remove-orphans || true
+      - name: Setup PHP 8.4
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pdo_pgsql, mbstring, zip, pdo
+          coverage: none
 
-      - name: Create CI env file for docker-compose
-        run: |
-          APP_KEY=$(php -r 'echo "base64:".base64_encode(random_bytes(32));')
-          printf '%s\n' \
-            "DB_USERNAME=postgres" \
-            "DB_PASSWORD=postgres" \
-            "DB_DATABASE=sims_test" \
-            "DB_PORT=5432" \
-            "APP_ENV=testing" \
-            "APP_KEY=$APP_KEY" \
-            "PGADMIN_EMAIL=ci@example.com" \
-            "PGADMIN_PASSWORD=ci-password" \
-            "UID=0" \
-            "GID=0" > .env.ci
-
-      - name: Build Docker image
-        run: docker compose --env-file .env.ci build api
-
-      - name: Start PostgreSQL
-        run: docker compose --env-file .env.ci up -d postgres
-
-      - name: Start API container
-        run: docker compose --env-file .env.ci up -d api
-
-      - name: Ensure storage and cache dirs exist
-        run: |
-          docker compose --env-file .env.ci exec -T -u root api bash -lc "
-            mkdir -p bootstrap/cache \
-              storage/logs \
-              storage/framework/cache \
-              storage/framework/sessions \
-              storage/framework/testing \
-              storage/framework/views \
-            && chmod -R 775 bootstrap/cache storage
-          "
+      - name: Cache Composer
+        uses: actions/cache@v4
+        with:
+          path: vendor
+          key: composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: composer-
 
       - name: Install dependencies
-        run: |
-          docker compose --env-file .env.ci exec -T -u root \
-            -e COMPOSER_HOME=/tmp/composer \
-            -e HOME=/tmp \
-            api bash -lc "
-              mkdir -p /tmp/composer /var/www/html && \
-              chown -R 0:0 /var/www/html && \
-              composer install --prefer-dist --no-interaction --no-progress
-            "
+        run: composer install --no-dev --prefer-dist --no-interaction --no-progress
 
       - name: Run Pint
-        run: docker compose --env-file .env.ci exec -T api vendor/bin/pint --test
+        run: vendor/bin/pint --test
 
-      - name: Run migrations (retry until DB ready)
+      - name: Create test .env
         run: |
-          docker compose --env-file .env.ci exec -T -e APP_ENV=testing api bash -lc '
-            for i in $(seq 1 30); do
-              php artisan migrate --no-interaction && break || sleep 2;
-            done
-          '
+          cp .env.example .env
+          APP_KEY=$(php -r 'echo "base64:".base64_encode(random_bytes(32));')
+          sed -i \
+            -e "s|^APP_KEY=.*|APP_KEY=$APP_KEY|" \
+            -e "s|^DB_CONNECTION=.*|DB_CONNECTION=pgsql|" \
+            -e "s|^DB_HOST=.*|DB_HOST=127.0.0.1|" \
+            -e "s|^DB_PORT=.*|DB_PORT=5432|" \
+            -e "s|^DB_USERNAME=.*|DB_USERNAME=postgres|" \
+            -e "s|^DB_PASSWORD=.*|DB_PASSWORD=postgres|" \
+            -e "s|^DB_DATABASE=.*|DB_DATABASE=sims_test|" \
+            .env
+
+      - name: Verify migrations against PostgreSQL
+        run: php artisan migrate --no-interaction
 
       - name: Run tests
-        run: docker compose --env-file .env.ci exec -T -e APP_ENV=testing api php artisan test
-
-      - name: Tear down Docker Compose
-        if: always()
-        run: docker compose --env-file .env.ci down --volumes --remove-orphans
+        run: php artisan test
 
   deploy:
     needs: test
     runs-on: ubuntu-latest
     name: Deploy to Production Server
     if: success()
-    env:
-      COMPOSE_FILE: docker-compose.yml
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup SSH Key
+      - name: Setup SSH
         env:
           SSH_KEY_B64: ${{ secrets.DEPLOY_SSH_KEY_B64 }}
           SSH_HOST: ${{ secrets.DEPLOY_HOST }}
-          SSH_USER: ${{ secrets.DEPLOY_USER }}
           SSH_PORT: ${{ secrets.DEPLOY_PORT }}
         run: |
           mkdir -p ~/.ssh
           echo "$SSH_KEY_B64" | base64 -d > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -p ${SSH_PORT:-22} -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
-          cat >> ~/.ssh/config << EOF
-          Host deploy
-            HostName $SSH_HOST
-            Port ${SSH_PORT:-22}
-            User $SSH_USER
-            IdentityFile ~/.ssh/deploy_key
-            StrictHostKeyChecking no
-          EOF
-          chmod 600 ~/.ssh/config
+          ssh-keyscan -p "${SSH_PORT:-22}" -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
 
-      - name: Pull latest code
+      - name: Deploy
         env:
           SSH_USER: ${{ secrets.DEPLOY_USER }}
           SSH_HOST: ${{ secrets.DEPLOY_HOST }}
           SSH_PORT: ${{ secrets.DEPLOY_PORT }}
         run: |
-          ssh -p ${SSH_PORT:-22} -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" << 'EOF'
+          ssh -p "${SSH_PORT:-22}" -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" << 'ENDDEPLOY'
           set -euo pipefail
           cd /var/www/sims-back
-          
-          # Fix ownership and permissions for git operations
-          sudo chown -R $USER:$USER .git 2>/dev/null || true
-          sudo chmod -R u+w .git 2>/dev/null || true
-          
-          # Configure git safe directory and use GitHub SSH key for fetch
+          export COMPOSE_FILE=docker-compose.yml
+
+          # ── 1. Actualizar código ──────────────────────────────────────────
           git config --global --add safe.directory /var/www/sims-back
           git config core.sshCommand "ssh -i ~/.ssh/github_deploy_repo -o StrictHostKeyChecking=no"
-          
-          # Verify SSH key exists and is accessible
-          test -f ~/.ssh/github_deploy_repo || (echo "SSH key not found"; exit 1)
-          
-          # Fetch and reset to latest
           git fetch --all --prune
           git reset --hard origin/main
-          EOF
 
-      - name: Install Composer dependencies on server
-        env:
-          SSH_USER: ${{ secrets.DEPLOY_USER }}
-          SSH_HOST: ${{ secrets.DEPLOY_HOST }}
-          SSH_PORT: ${{ secrets.DEPLOY_PORT }}
-        run: |
-          ssh -p ${SSH_PORT:-22} -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" << 'EOF'
-          set -euo pipefail
-          cd /var/www/sims-back
-
-          docker run --rm \
-            -v "$PWD":/app \
-            -w /app \
-            composer:2 \
-            install --no-dev --optimize-autoloader --no-interaction --no-progress
-          EOF
-
-      - name: Normalize production env for tenant subdomains
-        env:
-          SSH_USER: ${{ secrets.DEPLOY_USER }}
-          SSH_HOST: ${{ secrets.DEPLOY_HOST }}
-          SSH_PORT: ${{ secrets.DEPLOY_PORT }}
-        run: |
-          ssh -p ${SSH_PORT:-22} -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" << 'EOF'
-          set -euo pipefail
-          cd /var/www/sims-back
-
-          if [ ! -f .env ]; then
-            cp .env.example .env
-          fi
+          # ── 2. Preparar .env ─────────────────────────────────────────────
+          [ -f .env ] || cp .env.example .env
 
           set_env() {
-            key="$1"
-            value="$2"
+            key="$1"; value="$2"
             if grep -q "^${key}=" .env; then
               sed -i "s|^${key}=.*|${key}=${value}|" .env
             else
               printf '%s=%s\n' "$key" "$value" >> .env
             fi
           }
-
           set_env_if_missing() {
-            key="$1"
-            value="$2"
+            key="$1"; value="$2"
             current="$(grep "^${key}=" .env | head -n1 | cut -d= -f2- | tr -d '\r' || true)"
-            if [ -z "$current" ]; then
-              set_env "$key" "$value"
-            fi
+            [ -n "$current" ] || set_env "$key" "$value"
           }
 
           app_domain="$(grep '^APP_DOMAIN=' .env | head -n1 | cut -d= -f2- | tr -d '\r' || true)"
           app_url="$(grep '^APP_URL=' .env | head -n1 | cut -d= -f2- | tr -d '\r' || true)"
+          [ -n "$app_domain" ] || app_domain="$(printf '%s' "$app_url" | sed -E 's#^[a-zA-Z]+://##; s#/.*$##')"
+          [ -n "$app_domain" ] || { echo "ERROR: APP_DOMAIN no definido en .env"; exit 1; }
 
-          if [ -z "$app_domain" ] && [ -n "$app_url" ]; then
-            app_domain="$(printf '%s' "$app_url" | sed -E 's#^[a-zA-Z]+://##; s#/.*$##')"
-          fi
-
-          if [ -z "$app_domain" ]; then
-            echo "APP_DOMAIN no está definido y no se pudo inferir desde APP_URL"
-            exit 1
-          fi
-
-          # TENANT_BASE_DOMAIN must be set explicitly in .env on the server.
-          # It differs from APP_DOMAIN: APP_DOMAIN is the central/SuperAdmin host
-          # (e.g. jilsoftwares.example.com) while TENANT_BASE_DOMAIN is the parent
-          # domain used to build tenant subdomains (e.g. example.com so tenants
-          # become aaa.example.com, covered by *.example.com wildcard cert).
-          # Only set a default if the value is completely missing.
           set_env_if_missing TENANT_BASE_DOMAIN "$app_domain"
-
           tenant_base_domain="$(grep '^TENANT_BASE_DOMAIN=' .env | head -n1 | cut -d= -f2- | tr -d '\r' || true)"
           [ -n "$tenant_base_domain" ] || tenant_base_domain="$app_domain"
 
           set_env SESSION_DOMAIN ".$tenant_base_domain"
-
-          sanctum_domains="${app_domain},.${tenant_base_domain},185.13.77.175,185.13.77.175:8000"
-          set_env SANCTUM_STATEFUL_DOMAINS "$sanctum_domains"
-
-          cors_origins="https://${app_domain}"
-          set_env CORS_ALLOWED_ORIGINS "$cors_origins"
-
-          cors_pattern="#^https?://[a-z0-9-]+[.]${tenant_base_domain//./[.]}(:[0-9]+)?\$#i"
-          set_env CORS_ALLOWED_ORIGINS_PATTERNS "$cors_pattern"
-
-          # SuperAdmin credentials (only set defaults when missing)
+          set_env SANCTUM_STATEFUL_DOMAINS "${app_domain},.${tenant_base_domain},185.13.77.175,185.13.77.175:8000"
+          set_env CORS_ALLOWED_ORIGINS "https://${app_domain}"
+          set_env CORS_ALLOWED_ORIGINS_PATTERNS "#^https?://[a-z0-9-]+[.]${tenant_base_domain//./[.]}(:[0-9]+)?\$#i"
           set_env_if_missing SUPERADMIN_NAME "Super Admin"
           set_env_if_missing SUPERADMIN_EMAIL "superadmin@example.com"
           set_env_if_missing SUPERADMIN_PASSWORD "change_this_superadmin_password"
-
-          # Corrige truncados/copias rotas de env anteriores
           sed -i 's/>$//' .env
-          EOF
 
-      - name: Build and start Docker containers
-        env:
-          SSH_USER: ${{ secrets.DEPLOY_USER }}
-          SSH_HOST: ${{ secrets.DEPLOY_HOST }}
-          SSH_PORT: ${{ secrets.DEPLOY_PORT }}
-        run: |
-          ssh -p ${SSH_PORT:-22} -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" \
-            "cd /var/www/sims-back && \
-             export COMPOSE_FILE=docker-compose.yml && \
-             docker compose down --volumes --remove-orphans && \
-             docker builder prune -af && \
-             docker image prune -af && \
-             docker volume prune -f && \
-             echo '→ Building Docker image (multi-stage: composer already compiled)...' && \
-             docker compose build && \
-             echo '→ Starting containers...' && \
-             docker compose up -d && \
-             echo 'Containers started, waiting for PHP-FPM initialization (60 seconds)...' && \
-             sleep 60 && \
-             echo 'Verifying containers are running...' && \
-             docker compose ps"
+          # ── 3. Asegurar postgres en marcha (preserva datos) ───────────────
+          docker compose up -d postgres
 
-      - name: Fix runtime permissions and APP_KEY
-        env:
-          SSH_USER: ${{ secrets.DEPLOY_USER }}
-          SSH_HOST: ${{ secrets.DEPLOY_HOST }}
-          SSH_PORT: ${{ secrets.DEPLOY_PORT }}
-        run: |
-          ssh -p ${SSH_PORT:-22} -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" << 'EOFSETUP'
-          set -euo pipefail
-          cd /var/www/sims-back
-          export COMPOSE_FILE=docker-compose.yml
-          
-          echo "========== DEBUG: Checking Docker state =========="
-          docker compose ps
-          echo ""
-          
-          echo "========== DEBUG: API Container logs (last 100 lines) =========="
-          docker compose logs --tail=100 api || echo "No logs yet"
-          echo ""
-          
-          # Check processes inside container
-          echo "========== DEBUG: Checking Supervisor inside container =========="
-          docker compose exec -T api ps aux | grep -E "supervisor|php-fpm|artisan" || echo "No supervisor/php-fpm running"
-          echo ""
-          
-          # Wait for PHP-FPM to be ready (up to 90 seconds)
-          echo "Waiting for PHP-FPM initialization (up to 90 seconds)..."
-          attempt=0
-          max_attempts=45
-          while [ $attempt -lt $max_attempts ]; do
-            attempt=$((attempt+1))
-            
-            # Try to execute a simple PHP command
+          # ── 4. Reconstruir solo la imagen api y recrear sus contenedores ──
+          # postgres NO se toca: los datos se preservan entre deploys
+          docker compose build api
+          docker compose up -d --no-deps --force-recreate api api_web
+
+          # ── 5. Esperar a que PHP-FPM esté listo (max 60s) ─────────────────
+          echo "Esperando PHP-FPM..."
+          for i in $(seq 1 30); do
             if docker compose exec -T api php -v > /dev/null 2>&1; then
-              echo "✓ PHP-FPM is responding (attempt $attempt/$max_attempts)"
+              echo "✓ PHP-FPM listo (${i}x2s)"
               break
             fi
-            
-            if [ $((attempt % 5)) -eq 0 ]; then
-              echo "DEBUG: Attempt $attempt/$max_attempts - Container status:"
-              docker compose ps api
-              echo "Last lines from container:"
-              docker compose logs --tail=3 api || true
-            fi
-            
+            [ "$i" -lt 30 ] || { echo "❌ PHP-FPM no responde"; docker compose logs --tail=50 api; exit 1; }
             sleep 2
           done
-          
-          if [ $attempt -ge $max_attempts ]; then
-            echo "❌ ERROR: PHP-FPM not responding after $max_attempts attempts (90 seconds)"
-            echo "========== FINAL DEBUG: Full container logs =========="
-            docker compose logs --tail=200 api
-            echo ""
-            echo "========== DEBUG: Docker inspect api container =========="
-            docker inspect sims_api | grep -A5 State || true
-            exit 1
-          fi
-          
-          # Get UID and GID from .env or use defaults
-          APP_UID=$(grep '^UID=' .env | cut -d= -f2 | tr -d '\r' || true)
-          APP_GID=$(grep '^GID=' .env | cut -d= -f2 | tr -d '\r' || true)
-          [ -n "$APP_UID" ] || APP_UID=33
-          [ -n "$APP_GID" ] || APP_GID=33
-          
-          # Create storage and cache directories with proper permissions
-          docker compose exec -T -u root api bash -lc "
-            mkdir -p /var/www/html/storage/logs
-            mkdir -p /var/www/html/storage/framework/{cache,sessions,views,testing}
-            mkdir -p /var/www/html/bootstrap/cache
+
+          # ── 6. Permisos de storage y APP_KEY ─────────────────────────────
+          APP_UID="$(grep '^UID=' .env | cut -d= -f2 | tr -d '\r' || echo 33)"
+          APP_GID="$(grep '^GID=' .env | cut -d= -f2 | tr -d '\r' || echo 33)"
+          docker compose exec -T -u root api bash -c "
+            mkdir -p /var/www/html/storage/logs \
+                     /var/www/html/storage/framework/{cache,sessions,views,testing} \
+                     /var/www/html/bootstrap/cache
             touch /var/www/html/storage/logs/laravel.log
-            chown -R $APP_UID:$APP_GID /var/www/html/storage /var/www/html/bootstrap/cache
+            chown -R ${APP_UID}:${APP_GID} /var/www/html/storage /var/www/html/bootstrap/cache
             chmod -R ug+rwX /var/www/html/storage /var/www/html/bootstrap/cache
           " || true
-          
-          # Verify Composer dependencies (already installed in Docker build stage)
-          echo "Verifying vendor/autoload.php..."
-          docker compose exec -T api test -f vendor/autoload.php && \
-            echo "✓ vendor/autoload.php present" || \
-            (echo "❌ ERROR: vendor/autoload.php not found!"; exit 1)
-          
-          # Generate and set APP_KEY if not already set
+
           if ! grep -q '^APP_KEY=base64:' .env; then
             KEY=$(docker compose exec -T api php artisan key:generate --show)
             sed -i "s|^APP_KEY=.*|APP_KEY=$KEY|" .env
+            docker compose up -d --no-deps --force-recreate api
+            sleep 5
           fi
-          
-          # Clear caches and compile configuration
-          docker compose exec -T api php artisan optimize:clear
-          docker compose exec -T api php artisan cache:clear
-          docker compose exec -T api php artisan route:clear
-          docker compose exec -T api php artisan view:clear
-          docker compose exec -T api php artisan config:cache
-          EOFSETUP
 
-      - name: Run Laravel migrations
-        env:
-          SSH_USER: ${{ secrets.DEPLOY_USER }}
-          SSH_HOST: ${{ secrets.DEPLOY_HOST }}
-          SSH_PORT: ${{ secrets.DEPLOY_PORT }}
-        run: |
-          ssh -p ${SSH_PORT:-22} -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" \
-            "cd /var/www/sims-back && export COMPOSE_FILE=docker-compose.yml && sleep 10 && for i in \$(seq 1 5); do docker compose exec -T api php artisan migrate --force && break || sleep 5; done"
+          # ── 7. Migraciones centrales ──────────────────────────────────────
+          for i in $(seq 1 5); do
+            docker compose exec -T api php artisan migrate --force && break || sleep 3
+          done
 
-      - name: Run tenant migrations for initial tenant
-        env:
-          SSH_USER: ${{ secrets.DEPLOY_USER }}
-          SSH_HOST: ${{ secrets.DEPLOY_HOST }}
-          SSH_PORT: ${{ secrets.DEPLOY_PORT }}
-        run: |
-          ssh -p ${SSH_PORT:-22} -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" \
-            "cd /var/www/sims-back && export COMPOSE_FILE=docker-compose.yml && \
-             TENANT_ID=\$(grep '^INITIAL_TENANT_ID=' .env | cut -d= -f2- | tr -d '\r' || true) && \
-             if [ -n \"\$TENANT_ID\" ]; then \
-               docker compose exec -T api php artisan db:seed --class=InitialTenantSeeder --force && \
-               docker compose exec -T api php artisan tenants:migrate --tenants=\"\$TENANT_ID\" --force; \
-             else echo 'INITIAL_TENANT_ID not set, skipping tenant setup'; fi"
+          # ── 8. Migraciones de todos los tenants existentes ────────────────
+          docker compose exec -T api php artisan tenants:migrate --force || true
 
-      - name: Run Laravel seeders
-        env:
-          SSH_USER: ${{ secrets.DEPLOY_USER }}
-          SSH_HOST: ${{ secrets.DEPLOY_HOST }}
-          SSH_PORT: ${{ secrets.DEPLOY_PORT }}
-        run: |
-          ssh -p ${SSH_PORT:-22} -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" \
-            "cd /var/www/sims-back && export COMPOSE_FILE=docker-compose.yml && docker compose exec -T api php artisan db:seed --force"
+          # ── 9. Seeders (idempotentes: SuperAdmin + tenant inicial) ─────────
+          docker compose exec -T api php artisan db:seed --force
 
-      - name: Ensure SuperAdmin exists and password matches env
-        env:
-          SSH_USER: ${{ secrets.DEPLOY_USER }}
-          SSH_HOST: ${{ secrets.DEPLOY_HOST }}
-          SSH_PORT: ${{ secrets.DEPLOY_PORT }}
-        run: |
-          ssh -p ${SSH_PORT:-22} -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" \
-            "cd /var/www/sims-back && \
-             export COMPOSE_FILE=docker-compose.yml && \
-             docker compose exec -T api php artisan db:seed --class=SuperAdminSeeder --force"
+          # ── 10. Optimizar ─────────────────────────────────────────────────
+          docker compose exec -T api php artisan optimize
 
-      - name: Restart containers
-        env:
-          SSH_USER: ${{ secrets.DEPLOY_USER }}
-          SSH_HOST: ${{ secrets.DEPLOY_HOST }}
-          SSH_PORT: ${{ secrets.DEPLOY_PORT }}
-        run: |
-          ssh -p ${SSH_PORT:-22} -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" \
-            "cd /var/www/sims-back && export COMPOSE_FILE=docker-compose.yml && docker compose restart"
+          echo "✅ Deploy completado"
+          ENDDEPLOY
 
       - name: Verify deployment
         env:
@@ -409,8 +199,8 @@ jobs:
           SSH_HOST: ${{ secrets.DEPLOY_HOST }}
           SSH_PORT: ${{ secrets.DEPLOY_PORT }}
         run: |
-          ssh -p ${SSH_PORT:-22} -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" \
-            "cd /var/www/sims-back && \
-             export COMPOSE_FILE=docker-compose.yml && \
-             docker ps --filter label=com.docker.compose.project=sims-back && \
-             docker compose exec -T api php artisan about >/dev/null || (docker compose logs --tail 200 api && exit 1)"
+          ssh -p "${SSH_PORT:-22}" -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" \
+            "cd /var/www/sims-back && export COMPOSE_FILE=docker-compose.yml && \
+             docker compose ps && \
+             docker compose exec -T api php artisan about --only=Environment \
+               || { docker compose logs --tail=100 api; exit 1; }"
