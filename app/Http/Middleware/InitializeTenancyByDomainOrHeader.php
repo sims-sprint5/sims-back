@@ -25,21 +25,40 @@ class InitializeTenancyByDomainOrHeader extends IdentificationMiddleware
 
     public function handle(Request $request, Closure $next): Response
     {
-        // Priority 1: X-Tenant header allows API calls from any domain
-        if ($request->hasHeader('X-Tenant')) {
-            $tenantId = $request->header('X-Tenant');
-            $tenant = Tenant::find($tenantId);
+        // Prioridad 1: extraer slug del subdominio y buscar por ID en BD.
+        // aaa.jilsoftwares.deltahost.asix2.iesmontsia.cat → slug = "aaa" → Tenant::find("aaa")
+        // Así cualquier tenant creado con ese ID funciona automáticamente en su subdominio
+        // sin necesidad de registrar el dominio en la tabla domains.
+        $slug = $this->extractSlugFromHost($request->getHost());
 
-            if (! $tenant) {
-                return response()->json(['message' => 'Tenant not found.'], 404);
+        if ($slug !== null) {
+            $tenant = Tenant::find($slug);
+
+            if ($tenant) {
+                $this->tenancy->initialize($tenant);
+
+                return $next($request);
             }
-
-            $this->tenancy->initialize($tenant);
-
-            return $next($request);
         }
 
-        // Priority 2: Domain lookup (subdomain-based access)
+        // Prioridad 2: búsqueda exacta en tabla domains (comportamiento original)
         return $this->initializeTenancy($request, $next, $request->getHost());
+    }
+
+    private function extractSlugFromHost(string $host): ?string
+    {
+        $baseDomain = (string) env('TENANT_BASE_DOMAIN', '');
+
+        if ($baseDomain === '') {
+            return null;
+        }
+
+        $escaped = preg_quote($baseDomain, '/');
+
+        if (preg_match('/^([a-z0-9][a-z0-9\-]*)\.'.$escaped.'$/i', $host, $matches)) {
+            return $matches[1];
+        }
+
+        return null;
     }
 }
