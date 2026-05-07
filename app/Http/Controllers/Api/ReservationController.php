@@ -57,7 +57,7 @@ class ReservationController extends Controller
             'end_date' => 'required|date|after_or_equal:start_date',
             'pickup_location' => 'nullable|string|max:255',
             'dropoff_location' => 'nullable|string|max:255',
-            'status' => 'nullable|string|in:pending,paid,active,completed,cancelled',
+            'status' => 'nullable|string|in:Completat',
             'total_cost' => 'nullable|numeric|min:0',
         ]);
 
@@ -159,7 +159,7 @@ class ReservationController extends Controller
             'end_date' => 'sometimes|date',
             'pickup_location' => 'nullable|string|max:255',
             'dropoff_location' => 'nullable|string|max:255',
-            'status' => 'sometimes|string|in:pending,paid,active,completed,cancelled',
+            'status' => 'sometimes|string|in:Completat',
             'total_cost' => 'nullable|numeric|min:0',
         ]);
 
@@ -337,7 +337,7 @@ class ReservationController extends Controller
         $reservation = Reservation::findOrFail($id);
 
         $validated = $request->validate([
-            'status' => 'required|string|in:pending,paid,active,completed,cancelled',
+            'status' => 'required|string|in:Completat',
         ]);
 
         $reservation->update($validated);
