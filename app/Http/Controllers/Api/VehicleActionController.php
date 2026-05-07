@@ -25,11 +25,8 @@ class VehicleActionController extends Controller
             return response()->json(['message' => 'No tens permís per interactuar amb aquesta reserva.'], 403);
         }
 
-        // Verificacions de la reserva: Estat actiu i dins del període establert
+        // Verificacions de la reserva: Dins del període establert
         $now = now();
-        if ($reservation->status !== 'active') {
-            return response()->json(['message' => 'La reserva no està activa.'], 403);
-        }
 
         if ($now->lt($reservation->start_date) || $now->gt($reservation->end_date)) {
             return response()->json(['message' => 'Només pots interactuar amb el vehicle durant el període assignat de la reserva.'], 403);

@@ -10,7 +10,7 @@ class ReservationFactory extends Factory
 {
     public function definition(): array
     {
-        $startDate = fake()->dateTimeBetween('+1 days', '+30 days');
+        $startDate = fake()->dateTimeBetween('+2 days', '+30 days');
         $endDate = fake()->dateTimeBetween($startDate, '+60 days');
 
         return [
@@ -20,7 +20,7 @@ class ReservationFactory extends Factory
             'end_date' => $endDate,
             'pickup_location' => fake()->randomElement(['Main Station', 'City Center', 'Airport Terminal', 'North Hub']),
             'dropoff_location' => fake()->randomElement(['Main Station', 'City Center', 'Airport Terminal', 'North Hub']),
-            'status' => fake()->randomElement(['pending', 'active', 'completed', 'cancelled']),
+            'status' => 'Completat',
             'total_cost' => fake()->randomFloat(2, 50, 500),
         ];
     }
