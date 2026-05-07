@@ -181,11 +181,11 @@ jobs:
             docker compose exec -T api php artisan migrate --force && break || sleep 3
           done
 
-          # ── 8. Migraciones de todos los tenants existentes ────────────────
-          docker compose exec -T api php artisan tenants:migrate --force || true
-
-          # ── 9. Seeders (idempotentes: SuperAdmin + tenant inicial) ─────────
+          # ── 8. Seeders (crean SuperAdmin y tenant inicial antes de migrar) ──
           docker compose exec -T api php artisan db:seed --force
+
+          # ── 9. Migraciones de tenant (schema se crea aquí, después del seed) ─
+          docker compose exec -T api php artisan tenants:migrate --force || true
 
           # ── 10. Optimizar ─────────────────────────────────────────────────
           docker compose exec -T api php artisan optimize
