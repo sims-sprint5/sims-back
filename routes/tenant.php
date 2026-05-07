@@ -12,11 +12,11 @@ use App\Http\Controllers\Api\TicketController;
 use App\Http\Controllers\Api\TicketMessageController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\VehicleController;
+use App\Http\Middleware\InitializeTenancyByDomainOrHeader;
 use Illuminate\Support\Facades\Route;
-use Stancl\Tenancy\Middleware\InitializeTenancyByDomain;
 
 Route::prefix('api')->middleware([
-    InitializeTenancyByDomain::class,
+    InitializeTenancyByDomainOrHeader::class,
     'api',
 ])->group(function () {
 

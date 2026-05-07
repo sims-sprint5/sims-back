@@ -4,6 +4,7 @@ use App\Http\Middleware\Authenticate;
 use App\Http\Middleware\CorsMiddleware;
 use App\Http\Middleware\EnsureSuperAdmin;
 use App\Http\Middleware\EnsureTenantUser;
+use App\Http\Middleware\InitializeTenancyByDomainOrHeader;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\QueryException;
@@ -35,6 +36,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // Tenancy must initialize before access-prevention check
         $middleware->priority([
+            InitializeTenancyByDomainOrHeader::class,
             InitializeTenancyBySubdomain::class,
             PreventAccessFromCentralDomains::class,
             SubstituteBindings::class,
