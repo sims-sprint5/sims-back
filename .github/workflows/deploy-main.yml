@@ -39,11 +39,11 @@ jobs:
         uses: actions/cache@v4
         with:
           path: vendor
-          key: composer-${{ hashFiles('**/composer.lock') }}
-          restore-keys: composer-
+          key: composer-dev-${{ hashFiles('**/composer.lock') }}
+          restore-keys: composer-dev-
 
       - name: Install dependencies
-        run: composer install --no-dev --prefer-dist --no-interaction --no-progress
+        run: composer install --prefer-dist --no-interaction --no-progress
 
       - name: Run Pint
         run: vendor/bin/pint --test
