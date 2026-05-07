@@ -63,6 +63,7 @@ Route::prefix('api')->middleware([
         Route::post('reservations/checkout', [ReservationCheckoutController::class, 'store']);
         Route::apiResource('reservations', ReservationController::class);
         Route::post('reservations/{id}/renewal-intent', [ReservationController::class, 'renewalIntent']);
+        Route::post('reservations/{reservation}/vehicle/{action}', [\App\Http\Controllers\Api\VehicleActionController::class, 'toggleAction']);
         Route::middleware(['role:Admin,sanctum'])->group(function () {
             Route::patch('reservations/{id}/status', [ReservationController::class, 'updateStatus']);
         });
