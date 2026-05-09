@@ -145,14 +145,17 @@ jobs:
           set_env CORS_ALLOWED_ORIGINS_PATTERNS "#^https?://[a-z0-9-]+[.]${tenant_base_domain//./[.]}(:[0-9]+)?\$#i"
           set_env STRIPE_SUCCESS_URL "https://{tenant}.${tenant_base_domain}/mapa"
           set_env STRIPE_CANCEL_URL "https://{tenant}.${tenant_base_domain}/mis-reservas"
-          set_env VEHICLE_SUBSYSTEM_URL "http://host.docker.internal:8088"
+          set_env VEHICLE_SUBSYSTEM_URL "http://iot-api:8000"
           [ -z "$VEHICLE_SUBSYSTEM_KEY" ] || set_env VEHICLE_SUBSYSTEM_KEY "$VEHICLE_SUBSYSTEM_KEY"
           set_env_if_missing SUPERADMIN_NAME "Super Admin"
           set_env_if_missing SUPERADMIN_EMAIL "superadmin@example.com"
           set_env_if_missing SUPERADMIN_PASSWORD "change_this_superadmin_password"
           sed -i 's/>$//' .env
 
-          # ── 3. Deploy subsistema IoT ──────────────────────────────────────
+          # ── 3. Asegurar postgres i sims_network en marcha ─────────────────
+          docker compose up -d postgres
+
+          # ── 4. Deploy subsistema IoT (necessita sims_network) ─────────────
           IOT_DIR="$HOME/subsistema"
           if [ -d "$IOT_DIR/.git" ]; then
             git -C "$IOT_DIR" config --global --add safe.directory "$IOT_DIR"
@@ -172,10 +175,7 @@ jobs:
 
           docker compose -f "$IOT_DIR/docker-compose.yml" up -d --build api
 
-          # ── 4. Asegurar postgres en marcha (preserva datos) ───────────────
-          docker compose up -d postgres
-
-          # ── 4. Reconstruir solo la imagen api y recrear sus contenedores ──
+          # ── 5. Reconstruir solo la imagen api y recrear sus contenedores ──
           # postgres NO se toca: los datos se preservan entre deploys
           docker compose build api
           docker compose up -d --no-deps --force-recreate api api_web
