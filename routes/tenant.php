@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\StripeWebhookController;
 use App\Http\Controllers\Api\TicketController;
 use App\Http\Controllers\Api\TicketMessageController;
 use App\Http\Controllers\Api\UserController;
+use App\Http\Controllers\Api\VehicleActionController;
 use App\Http\Controllers\Api\VehicleController;
 use Illuminate\Support\Facades\Route;
 use Stancl\Tenancy\Middleware\InitializeTenancyBySubdomain;
@@ -63,7 +64,7 @@ Route::prefix('api')->middleware([
         Route::post('reservations/checkout', [ReservationCheckoutController::class, 'store']);
         Route::apiResource('reservations', ReservationController::class);
         Route::post('reservations/{id}/renewal-intent', [ReservationController::class, 'renewalIntent']);
-        Route::post('reservations/{reservation}/vehicle/{action}', [\App\Http\Controllers\Api\VehicleActionController::class, 'toggleAction']);
+        Route::post('reservations/{reservation}/vehicle/{action}', [VehicleActionController::class, 'toggleAction']);
         Route::middleware(['role:Admin,sanctum'])->group(function () {
             Route::patch('reservations/{id}/status', [ReservationController::class, 'updateStatus']);
         });
