@@ -77,8 +77,8 @@ class ReservationCheckoutController extends Controller
             $reservation = Reservation::create([
                 'user_id' => $user->user_id,
                 'vehicle_id' => $vehicle->vehicle_id,
-                'start_date' => $validated['start_date'],
-                'end_date' => $validated['end_date'],
+                'start_date' => $startDate->utc()->toDateTimeString(),
+                'end_date' => $endDate->utc()->toDateTimeString(),
                 'pickup_location' => $validated['pickup_location'] ?? null,
                 'dropoff_location' => $validated['dropoff_location'] ?? null,
                 'status' => 'pending',

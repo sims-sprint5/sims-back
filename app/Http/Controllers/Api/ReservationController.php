@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Reservation;
 use App\Models\Vehicle;
 use App\Services\ReservationAvailabilityService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -100,6 +101,9 @@ class ReservationController extends Controller
         if (empty($validated['status'])) {
             $validated['status'] = now()->gte($validated['start_date']) ? 'active' : 'pending';
         }
+
+        $validated['start_date'] = Carbon::parse($validated['start_date'])->utc()->toDateTimeString();
+        $validated['end_date'] = Carbon::parse($validated['end_date'])->utc()->toDateTimeString();
 
         $reservation = Reservation::create($validated);
 
@@ -207,6 +211,13 @@ class ReservationController extends Controller
                     'conflicting_reservation' => $availabilityCheck['conflicting_reservation'] ?? null,
                 ], 409);
             }
+        }
+
+        if (isset($validated['start_date'])) {
+            $validated['start_date'] = Carbon::parse($validated['start_date'])->utc()->toDateTimeString();
+        }
+        if (isset($validated['end_date'])) {
+            $validated['end_date'] = Carbon::parse($validated['end_date'])->utc()->toDateTimeString();
         }
 
         $reservation->update($validated);
