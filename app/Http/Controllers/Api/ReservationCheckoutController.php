@@ -5,9 +5,11 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Reservation;
 use App\Models\Vehicle;
+use App\Services\PriceCalculatorService;
 use App\Services\ReservationAvailabilityService;
 use App\Services\Stripe\StripeCheckoutService;
-use DateTime;
+use Carbon\Carbon;
+use InvalidArgumentException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -16,7 +18,11 @@ use Throwable;
 
 class ReservationCheckoutController extends Controller
 {
-    public function store(Request $request, StripeCheckoutService $stripeCheckoutService): JsonResponse
+    public function store(
+        Request $request,
+        StripeCheckoutService $stripeCheckoutService,
+        PriceCalculatorService $priceCalculatorService
+    ): JsonResponse
     {
         $user = $request->user();
 
@@ -30,7 +36,7 @@ class ReservationCheckoutController extends Controller
         $validated = $request->validate([
             'vehicle_id' => 'required|exists:vehicles,vehicle_id',
             'start_date' => 'required|date',
-            'end_date' => 'required|date|after_or_equal:start_date',
+            'end_date' => 'required|date|after:start_date',
             'pickup_location' => 'nullable|string|max:255',
             'dropoff_location' => 'nullable|string|max:255',
         ]);
@@ -41,8 +47,8 @@ class ReservationCheckoutController extends Controller
             return response()->json(['message' => 'Vehicle is not available for reservation.'], 422);
         }
 
-        $startDate = new DateTime($validated['start_date']);
-        $endDate = new DateTime($validated['end_date']);
+        $startDate = Carbon::parse($validated['start_date']);
+        $endDate = Carbon::parse($validated['end_date']);
 
         $availabilityCheck = $availability->checkAvailabilityForPeriod(
             (int) $vehicle->vehicle_id,
@@ -58,7 +64,13 @@ class ReservationCheckoutController extends Controller
             ], 409);
         }
 
-        $price = $stripeCheckoutService->resolveReservationPrice();
+        try {
+            $price = $priceCalculatorService->calculateReservationPrice($startDate, $endDate);
+        } catch (InvalidArgumentException $e) {
+            return response()->json([
+                'message' => $e->getMessage(),
+            ], 422);
+        }
 
         DB::beginTransaction();
 

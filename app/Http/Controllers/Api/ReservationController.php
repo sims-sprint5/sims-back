@@ -337,7 +337,7 @@ class ReservationController extends Controller
         $reservation = Reservation::findOrFail($id);
 
         $validated = $request->validate([
-            'status' => 'required|string|in:pending,paid,active,completed,cancelled',
+            'status' => 'required|string|in:Completat',
         ]);
 
         $reservation->update($validated);

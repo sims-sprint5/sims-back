@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Models\Tenant;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
+use Symfony\Component\Console\Command\Command as SymfonyCommand;
 
 class GenerateTenantCertificates extends Command
 {
@@ -20,7 +21,7 @@ class GenerateTenantCertificates extends Command
         if (! $certEmail) {
             $this->error('CERT_EMAIL environment variable is required.');
 
-            return Command::FAILURE;
+            return SymfonyCommand::FAILURE;
         }
 
         $tenants = Tenant::all();
@@ -28,7 +29,7 @@ class GenerateTenantCertificates extends Command
         if ($tenants->isEmpty()) {
             $this->info('No tenants found.');
 
-            return Command::SUCCESS;
+            return SymfonyCommand::SUCCESS;
         }
 
         foreach ($tenants as $tenant) {
@@ -48,6 +49,6 @@ class GenerateTenantCertificates extends Command
             }
         }
 
-        return Command::SUCCESS;
+        return SymfonyCommand::SUCCESS;
     }
 }

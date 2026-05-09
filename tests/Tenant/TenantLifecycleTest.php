@@ -147,7 +147,7 @@ class TenantLifecycleTest extends TestCase
             ->assertStatus(200)
             ->json('data.access_token');
 
-        $newName = 'Nuevo Nombre';
+        $newName = 'New Name';
 
         $this->withToken($token)
             ->patchJson("http://{$this->tenantId}.lvh.me/api/v1/auth/me", [
@@ -181,8 +181,8 @@ class TenantLifecycleTest extends TestCase
 
         $geofenceResponse = $this->withToken($adminToken)
             ->postJson("http://{$this->tenantId}.lvh.me/api/v1/geofences", [
-                'name' => 'Zona 1',
-                'description' => 'Zona de prueba',
+                'name' => 'Zone 1',
+                'description' => 'Test Zone',
                 'type' => 'restricted',
                 'center_latitude' => 40.4168,
                 'center_longitude' => -3.7038,
@@ -198,7 +198,7 @@ class TenantLifecycleTest extends TestCase
         $userPassword = 'Test1234!';
 
         $this->postJson("http://{$this->tenantId}.lvh.me/api/v1/auth/register", [
-            'name' => 'Usuario Normal',
+            'name' => 'Normal User',
             'email' => $userEmail,
             'password' => $userPassword,
             'password_confirmation' => $userPassword,
@@ -216,13 +216,13 @@ class TenantLifecycleTest extends TestCase
         $this->withToken($userToken)
             ->getJson("http://{$this->tenantId}.lvh.me/api/v1/geofences")
             ->assertStatus(200)
-            ->assertJsonFragment(['name' => 'Zona 1']);
+            ->assertJsonFragment(['name' => 'Zone 1']);
 
         // User can view a geofence.
         $this->withToken($userToken)
             ->getJson("http://{$this->tenantId}.lvh.me/api/v1/geofences/{$geofenceId}")
             ->assertStatus(200)
-            ->assertJsonPath('name', 'Zona 1');
+            ->assertJsonPath('name', 'Zone 1');
 
         // User cannot include logs.
         $this->withToken($userToken)
@@ -267,7 +267,7 @@ class TenantLifecycleTest extends TestCase
         $userPassword = 'Test1234!';
 
         $this->postJson("http://{$this->tenantId}.lvh.me/api/v1/auth/register", [
-            'name' => 'Usuario Normal 1',
+            'name' => 'Normal User 1',
             'email' => $userEmail,
             'password' => $userPassword,
             'password_confirmation' => $userPassword,
@@ -285,13 +285,13 @@ class TenantLifecycleTest extends TestCase
         $ticketResponse = $this->withToken($userToken)
             ->postJson("http://{$this->tenantId}.lvh.me/api/v1/tickets", [
                 'type' => 'technical',
-                'subject' => 'No funciona',
-                'description' => 'Detalle del problema',
-                'priority' => 'alta',
+                'subject' => 'It does not work',
+                'description' => 'Problem detail',
+                'priority' => 'high',
             ]);
 
         $ticketResponse->assertStatus(201)
-            ->assertJsonPath('status', 'obert')
+            ->assertJsonPath('status', 'open')
             ->assertJsonMissingPath('priority');
         $ticketId = (string) $ticketResponse->json('ticket_id');
         $this->assertNotEmpty($ticketId);
@@ -307,27 +307,27 @@ class TenantLifecycleTest extends TestCase
         $this->withToken($adminToken)
             ->getJson("http://{$this->tenantId}.lvh.me/api/v1/tickets/{$ticketId}")
             ->assertStatus(200)
-            ->assertJsonPath('priority', 'baixa')
-            ->assertJsonPath('status', 'obert');
+            ->assertJsonPath('priority', 'low')
+            ->assertJsonPath('status', 'open');
 
         $this->withToken($adminToken)
             ->patchJson("http://{$this->tenantId}.lvh.me/api/v1/tickets/{$ticketId}", [
-                'priority' => 'baixa',
-                'status' => 'en_progres',
+                'priority' => 'low',
+                'status' => 'in_progress',
             ])
             ->assertStatus(200)
-            ->assertJsonPath('priority', 'baixa')
-            ->assertJsonPath('status', 'en_progres');
+            ->assertJsonPath('priority', 'low')
+            ->assertJsonPath('status', 'in_progress');
 
         // User can always see status, but never priority.
         $this->withToken($userToken)
             ->getJson("http://{$this->tenantId}.lvh.me/api/v1/tickets/{$ticketId}")
             ->assertStatus(200)
-            ->assertJsonPath('status', 'en_progres')
+            ->assertJsonPath('status', 'in_progress')
             ->assertJsonMissingPath('priority');
 
         // Send a message.
-        $messageText = 'Hola soporte, tengo una duda.';
+        $messageText = 'Hello support, I have a question.';
 
         $this->withToken($userToken)
             ->postJson("http://{$this->tenantId}.lvh.me/api/v1/tickets/{$ticketId}/messages", [
@@ -346,7 +346,7 @@ class TenantLifecycleTest extends TestCase
         $userEmail2 = "user2@{$this->tenantId}.lvh.me";
 
         $this->postJson("http://{$this->tenantId}.lvh.me/api/v1/auth/register", [
-            'name' => 'Usuario Normal 2',
+            'name' => 'Normal User 2',
             'email' => $userEmail2,
             'password' => $userPassword,
             'password_confirmation' => $userPassword,

@@ -46,4 +46,9 @@ return [
         'cancel_url' => env('STRIPE_CANCEL_URL', rtrim((string) env('FRONTEND_URL', 'http://localhost:5173'), '/').'/payment/cancel'),
     ],
 
+    'reservations' => [
+        'hourly_rate_eur' => (float) env('RESERVATION_HOURLY_RATE_EUR', 5.0),
+        'rounding' => env('RESERVATION_HOURLY_ROUNDING', 'exact'),
+    ],
+
 ];
