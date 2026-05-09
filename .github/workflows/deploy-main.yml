@@ -101,6 +101,9 @@ jobs:
             IOT_API_KEY="$IOT_API_KEY" \
             bash << 'ENDDEPLOY'
           set -euo pipefail
+          VEHICLE_SUBSYSTEM_KEY="${VEHICLE_SUBSYSTEM_KEY:-}"
+          IOT_MONGO_URI="${IOT_MONGO_URI:-}"
+          IOT_API_KEY="${IOT_API_KEY:-subsistemaequip2}"
           cd /var/www/sims-back
           export COMPOSE_FILE=docker-compose.yml
 
