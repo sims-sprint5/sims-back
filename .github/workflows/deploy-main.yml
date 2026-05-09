@@ -152,7 +152,8 @@ jobs:
           set_env_if_missing SUPERADMIN_PASSWORD "change_this_superadmin_password"
           sed -i 's/>$//' .env
 
-          # ── 3. Asegurar postgres i sims_network en marcha ─────────────────
+          # ── 3. Crear sims_network i arrancar postgres ─────────────────────
+          docker network create sims_network 2>/dev/null || true
           docker compose up -d postgres
 
           # ── 4. Deploy subsistema IoT (necessita sims_network) ─────────────
