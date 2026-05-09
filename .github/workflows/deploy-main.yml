@@ -153,13 +153,11 @@ jobs:
           IOT_DIR=/var/www/subsistema
           if [ -d "$IOT_DIR/.git" ]; then
             git -C "$IOT_DIR" config --global --add safe.directory "$IOT_DIR"
-            git -C "$IOT_DIR" config core.sshCommand "ssh -i ~/.ssh/github_deploy_repo -o StrictHostKeyChecking=no"
             git -C "$IOT_DIR" fetch --all --prune
             git -C "$IOT_DIR" reset --hard origin/main
           else
             mkdir -p "$IOT_DIR"
-            GIT_SSH_COMMAND="ssh -i ~/.ssh/github_deploy_repo -o StrictHostKeyChecking=no" \
-              git clone git@github.com:sims-sprint5/Subsistema-IoT.git "$IOT_DIR"
+            git clone https://github.com/sims-sprint5/Subsistema-IoT.git "$IOT_DIR"
           fi
 
           {
