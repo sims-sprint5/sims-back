@@ -153,7 +153,7 @@ jobs:
           sed -i 's/>$//' .env
 
           # ── 3. Deploy subsistema IoT ──────────────────────────────────────
-          IOT_DIR=/var/www/subsistema
+          IOT_DIR="$HOME/subsistema"
           if [ -d "$IOT_DIR/.git" ]; then
             git -C "$IOT_DIR" config --global --add safe.directory "$IOT_DIR"
             git -C "$IOT_DIR" fetch --all --prune
