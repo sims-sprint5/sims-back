@@ -31,6 +31,9 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Trust all reverse proxies (OpenResty → Apache → nginx chain)
+        $middleware->trustProxies(at: '*');
+
         // Global CORS – must run before everything else
         $middleware->prepend(CorsMiddleware::class);
 

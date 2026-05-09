@@ -65,6 +65,7 @@ services:
   api_web:
     image: nginx:1.27
     container_name: sims_api_web
+    restart: unless-stopped
     ports:
       - "8000:8000"
     volumes:

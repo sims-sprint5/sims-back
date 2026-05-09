@@ -181,7 +181,7 @@ jobs:
           docker compose build api
           docker compose up -d --no-deps --force-recreate api api_web
 
-          # ── 5. Esperar a que PHP-FPM esté listo (max 60s) ─────────────────
+          # ── 5. Esperar a que PHP-FPM y nginx estén listos ────────────────
           echo "Esperando PHP-FPM..."
           for i in $(seq 1 30); do
             if docker compose exec -T api php -v > /dev/null 2>&1; then
@@ -191,6 +191,14 @@ jobs:
             [ "$i" -lt 30 ] || { echo "❌ PHP-FPM no responde"; docker compose logs --tail=50 api; exit 1; }
             sleep 2
           done
+
+          sleep 3
+          if ! docker compose ps api_web | grep -q "Up"; then
+            echo "❌ Nginx (api_web) no está corriendo:"
+            docker compose logs --tail=50 api_web
+            exit 1
+          fi
+          echo "✓ Nginx listo"
 
           # ── 6. Permisos de storage y APP_KEY ─────────────────────────────
           APP_UID="$(grep '^UID=' .env | cut -d= -f2 | tr -d '\r' || echo 33)"
