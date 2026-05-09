@@ -63,6 +63,7 @@ Route::prefix('api')->middleware([
         Route::apiResource('reservations', ReservationController::class);
         Route::post('reservations/{id}/renewal-intent', [ReservationController::class, 'renewalIntent']);
         Route::post('reservations/{reservation}/vehicle/{action}', [VehicleActionController::class, 'toggleAction']);
+        Route::get('reservations/{reservation}/temperature', [VehicleActionController::class, 'latestTemperature']);
         Route::middleware(['role:Admin,sanctum'])->group(function () {
             Route::patch('reservations/{id}/status', [ReservationController::class, 'updateStatus']);
         });
