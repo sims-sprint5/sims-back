@@ -9,11 +9,11 @@ use App\Services\PriceCalculatorService;
 use App\Services\ReservationAvailabilityService;
 use App\Services\Stripe\StripeCheckoutService;
 use Carbon\Carbon;
-use InvalidArgumentException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use InvalidArgumentException;
 use Throwable;
 
 class ReservationCheckoutController extends Controller
@@ -22,8 +22,7 @@ class ReservationCheckoutController extends Controller
         Request $request,
         StripeCheckoutService $stripeCheckoutService,
         PriceCalculatorService $priceCalculatorService
-    ): JsonResponse
-    {
+    ): JsonResponse {
         $user = $request->user();
 
         if (! $user) {

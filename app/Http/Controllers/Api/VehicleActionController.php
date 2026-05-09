@@ -15,13 +15,13 @@ class VehicleActionController extends Controller
     public function toggleAction(Request $request, Reservation $reservation, string $action)
     {
         // Validar que l'acció sigui permesa
-        if (!in_array($action, ['on', 'off'])) {
+        if (! in_array($action, ['on', 'off'])) {
             return response()->json(['message' => "L'acció ha de ser 'on' o 'off'"], 400);
         }
 
         // Comprovar si l'usuari autenticat és el propietari d'aquesta reserva (o és Admin)
         $user = $request->user();
-        if ($reservation->user_id !== $user->getKey() && !$user->hasRole('Admin')) {
+        if ($reservation->user_id !== $user->getKey() && ! $user->hasRole('Admin')) {
             return response()->json(['message' => 'No tens permís per interactuar amb aquesta reserva.'], 403);
         }
 
@@ -43,7 +43,7 @@ class VehicleActionController extends Controller
         try {
             // Realitzar la petició HTTP POST (Proxy) al subsistema del vehicle
             $response = Http::withHeaders([
-                'X-API-Key' => $apiKey
+                'X-API-Key' => $apiKey,
             ])->post($url);
 
             if ($response->successful()) {
@@ -52,13 +52,13 @@ class VehicleActionController extends Controller
 
             return response()->json([
                 'message' => 'El subsistema del vehicle ha retornat un error.',
-                'details' => $response->json() ?? $response->body()
+                'details' => $response->json() ?? $response->body(),
             ], $response->status());
 
         } catch (\Exception $e) {
             return response()->json([
                 'message' => 'Error de connexió establint comunicació amb el vehicle.',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
