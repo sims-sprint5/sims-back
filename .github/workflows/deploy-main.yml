@@ -91,8 +91,13 @@ jobs:
           SSH_USER: ${{ secrets.DEPLOY_USER }}
           SSH_HOST: ${{ secrets.DEPLOY_HOST }}
           SSH_PORT: ${{ secrets.DEPLOY_PORT }}
+          VEHICLE_SUBSYSTEM_URL: ${{ secrets.VEHICLE_SUBSYSTEM_URL }}
+          VEHICLE_SUBSYSTEM_KEY: ${{ secrets.VEHICLE_SUBSYSTEM_KEY }}
         run: |
-          ssh -p "${SSH_PORT:-22}" -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" << 'ENDDEPLOY'
+          ssh -p "${SSH_PORT:-22}" -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" \
+            VEHICLE_SUBSYSTEM_URL="$VEHICLE_SUBSYSTEM_URL" \
+            VEHICLE_SUBSYSTEM_KEY="$VEHICLE_SUBSYSTEM_KEY" \
+            bash << 'ENDDEPLOY'
           set -euo pipefail
           cd /var/www/sims-back
           export COMPOSE_FILE=docker-compose.yml
@@ -135,6 +140,8 @@ jobs:
           set_env CORS_ALLOWED_ORIGINS_PATTERNS "#^https?://[a-z0-9-]+[.]${tenant_base_domain//./[.]}(:[0-9]+)?\$#i"
           set_env STRIPE_SUCCESS_URL "https://{tenant}.${tenant_base_domain}/mapa"
           set_env STRIPE_CANCEL_URL "https://{tenant}.${tenant_base_domain}/mis-reservas"
+          [ -z "$VEHICLE_SUBSYSTEM_URL" ] || set_env VEHICLE_SUBSYSTEM_URL "$VEHICLE_SUBSYSTEM_URL"
+          [ -z "$VEHICLE_SUBSYSTEM_KEY" ] || set_env VEHICLE_SUBSYSTEM_KEY "$VEHICLE_SUBSYSTEM_KEY"
           set_env_if_missing SUPERADMIN_NAME "Super Admin"
           set_env_if_missing SUPERADMIN_EMAIL "superadmin@example.com"
           set_env_if_missing SUPERADMIN_PASSWORD "change_this_superadmin_password"
