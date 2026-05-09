@@ -95,7 +95,7 @@ return Application::configure(basePath: dirname(__DIR__))
             return null;
         });
 
-         $exceptions->render(function (AuthenticationException $e, Request $request) {
+        $exceptions->render(function (AuthenticationException $e, Request $request) {
             if ($request->is('api/*') && $request->bearerToken() && tenant() !== null) {
                 // Bearer token present but invalid in tenant schema (e.g. central SuperAdmin token
                 // used on a tenant route). Return 403 instead of 401 to avoid triggering the
