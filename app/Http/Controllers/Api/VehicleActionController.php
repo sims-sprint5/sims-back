@@ -25,6 +25,11 @@ class VehicleActionController extends Controller
             return response()->json(['message' => 'No tens permís per interactuar amb aquesta reserva.'], 403);
         }
 
+        // Verificacions de la reserva: no cancel·lada
+        if (in_array($reservation->status, ['cancelled', 'cancelada'])) {
+            return response()->json(['message' => 'No pots interactuar amb una reserva cancel·lada.'], 403);
+        }
+
         // Verificacions de la reserva: Dins del període establert
         $now = now();
 
@@ -32,8 +37,7 @@ class VehicleActionController extends Controller
             return response()->json(['message' => 'Només pots interactuar amb el vehicle durant el període assignat de la reserva.'], 403);
         }
 
-        // Substituirem el '001' per $reservation->vehicle_id en el futur
-        $vehicleIdentifier = '001';
+        $vehicleIdentifier = str_pad((string) $reservation->vehicle_id, 3, '0', STR_PAD_LEFT);
 
         // Obtenir l'API KEY del subsistema des del .env (via config)
         $apiKey = env('VEHICLE_SUBSYSTEM_KEY', 'subsistemaequip2');
