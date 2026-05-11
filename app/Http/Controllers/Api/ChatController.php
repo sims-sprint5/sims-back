@@ -26,7 +26,7 @@ class ChatController extends Controller
 
         // System prompt with context about the business
         $systemPrompt = <<<'PROMPT'
-Eres un asistente de soporte para una plataforma de reserva de vehículos llamada SIMS.
+Eres un asistente de soporte para una plataforma de reserva de vehículos llamada Fleetly.
 
 **FUNCIONALIDADES DEL SISTEMA:**
 - Usuarios pueden crear, modificar y cancelar reservas de vehículos
