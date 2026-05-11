@@ -59,6 +59,12 @@ services:
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
       STRIPE_SUCCESS_URL: ${STRIPE_SUCCESS_URL:-}
       STRIPE_CANCEL_URL: ${STRIPE_CANCEL_URL:-}
+    healthcheck:
+      test: ["CMD-SHELL", "php -r \"$$f = @fsockopen('127.0.0.1', 9000, $$e, $$s, 1); exit($$f ? 0 : 1);\""]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+      start_period: 20s
     depends_on:
       - postgres
     networks:
@@ -74,7 +80,8 @@ services:
       - .:/var/www/html
       - ./docker/nginx/api.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
-      - api
+      api:
+        condition: service_healthy
     networks:
       - sims_network
 
