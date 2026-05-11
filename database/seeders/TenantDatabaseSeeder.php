@@ -2,11 +2,7 @@
 
 namespace Database\Seeders;
 
-use App\Models\Geofence;
-use App\Models\Reservation;
-use App\Models\Ticket;
 use App\Models\User;
-use App\Models\Vehicle;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 
@@ -42,23 +38,6 @@ class TenantDatabaseSeeder extends Seeder
         // Create initial Spatie roles and assign Super Admin to the first user in this tenant.
         $this->call(RolesAndPermissionsSeeder::class);
 
-        // Factories disabled in production
-        $vehicles = Vehicle::factory()->count(8)->create();
-
-        for ($i = 0; $i < 6; $i++) {
-            Reservation::factory()->create([
-                'user_id' => $allUsers->random()->user_id,
-                'vehicle_id' => $vehicles->random()->vehicle_id,
-            ]);
-        }
-
-        for ($i = 0; $i < 10; $i++) {
-            Ticket::factory()->create([
-                'user_id' => $allUsers->random()->user_id,
-                'vehicle_id' => $vehicles->random()->vehicle_id,
-            ]);
-        }
-
-        Geofence::factory()->count(5)->create();
+        // Vehicle, reservation and geofence seeders removed — data is created manually.
     }
 }
